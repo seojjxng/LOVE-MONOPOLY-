@@ -14,10 +14,11 @@
         .center-zone { grid-column: 2 / 5; grid-row: 2 / 5; background: #fff5f7; border: 3px dashed #ff80bf; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; }
         .sidebar { width: 320px; display: flex; flex-direction: column; gap: 20px; }
         .panel { background: #fff0f9; padding: 20px; border-radius: 20px; border: 2px solid #ffccd5; }
-        .btn { width: 100%; padding: 10px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin: 5px 0; font-size: 12px; }
+        .btn { width: 100%; padding: 10px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin: 5px 0; font-size: 12px; transition: transform 0.2s, background 0.2s; }
+        .btn:hover { background: #ff80bf; transform: scale(1.05); }
         .input-field { width: 93%; padding: 8px; margin: 5px 0; border: 1px solid #ffccd5; border-radius: 8px; }
         #log, #chat-log { height: 150px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; margin-bottom: 10px; }
-        #modal { display: none; position: fixed; top: 20%; left: 35%; width: 300px; background: #ffe4e9; padding: 20px; border: 3px solid #ff80bf; border-radius: 15px; text-align: center; z-index: 999; box-shadow: 5px 5px 15px rgba(0,0,0,0.1); }
+        #modal, #contrato-modal { display: none; position: fixed; top: 20%; left: 35%; width: 300px; background: #ffe4e9; padding: 20px; border: 3px solid #ff80bf; border-radius: 15px; text-align: center; z-index: 999; box-shadow: 5px 5px 15px rgba(0,0,0,0.1); }
         #dado-valor { font-size: 24px; font-weight: bold; margin: 10px 0; }
         #banco-container { grid-column: 1 / 6; grid-row: 6 / 7; display: flex; align-items: center; justify-content: center; background: #ffccd5; border-radius: 15px; }
     </style>
@@ -63,6 +64,12 @@
     <button class="btn" onclick="document.getElementById('modal').style.display='none'">Cerrar</button>
 </div>
 
+<div id="contrato-modal">
+    <h3>¡Contrato Firmado!</h3>
+    <p>Has adquirido un préstamo bancario. El dinero ha sido añadido a tu cuenta.</p>
+    <button class="btn" onclick="document.getElementById('contrato-modal').style.display='none'">Aceptar</button>
+</div>
+
 <script>
     const firebaseConfig = { databaseURL: "https://monopolovely-default-rtdb.firebaseio.com" };
     firebase.initializeApp(firebaseConfig);
@@ -105,18 +112,11 @@
             
             if(nuevaPos >= mapa.length) { 
                 let bon = 100;
-                if(j.deuda > 0) {
-                    let desc = Math.min(bon * 0.5, j.deuda);
-                    bon -= desc;
-                    db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ deuda: j.deuda - desc });
-                    log("El banco retuvo $" + desc + " de tu deuda.");
-                }
                 db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => (d || 0) + bon);
             }
 
             if(pos === 4) { 
                 db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: 11, enCarcel: true }); 
-                log(nombres[miIdx] + " en cárcel."); 
             } else { 
                 db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: pos }); 
                 verificarCasilla(pos, j.dinero);
@@ -133,73 +133,42 @@
             let b = document.createElement('button'); b.className = 'btn'; b.innerText = "Pedir $" + m;
             b.onclick = () => {
                 db.ref('salas/' + sala + '/jugadores/' + miIdx).transaction(j => { 
-                    if(j) { 
-                        j.dinero = (j.dinero || 0) + m; 
-                        j.deuda = (j.deuda || 0) + m; 
-                    }
+                    if(j) { j.dinero = (j.dinero || 0) + m; j.deuda = (j.deuda || 0) + m; }
                     return j; 
                 });
-                log(nombres[miIdx] + " solicitó $" + m);
                 document.getElementById('modal').style.display = 'none';
+                document.getElementById('contrato-modal').style.display = 'block';
             };
             div.appendChild(b);
         });
-        div.innerHTML += "<p style='font-size:10px'>Observación: El banco retendrá 50% de ingresos extra hasta saldar deuda.</p>";
         document.getElementById('modal').style.display = 'block';
     }
 
     function verificarCasilla(pos, dinero) {
         let div = document.getElementById('acciones'); div.innerHTML = "";
-        let tipo = mapa[pos].n;
-        if(tipo === "?" || tipo === "ARCA") {
-            let ev = eventos[Math.floor(Math.random()*eventos.length)];
-            db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => (d || 0) + (ev.g ? ev.m : -ev.m));
-            document.getElementById('modal-title').innerText = tipo === "?" ? "Suerte" : "Arca Comunal";
-            document.getElementById('modal-text').innerText = ev.txt;
-            document.getElementById('modal').style.display = 'block';
-        } else if (mapa[pos].p > 0) {
-            db.ref('salas/' + sala + '/propiedades/' + pos).once('value', s => {
-                let prop = s.val();
-                if(!s.exists()) {
-                    if(dinero >= mapa[pos].p) div.innerHTML = `<button class="btn" onclick="comprar(${pos})">Comprar $${mapa[pos].p}</button>`;
-                } else if(prop.owner == miIdx) {
-                    if(prop.nivel < 2) {
-                        if(dinero >= 50) div.innerHTML = `<button class="btn" onclick="mejorar(${pos})">Mejorar $50</button>`;
-                    } else if(prop.nivel == 2) {
-                        div.innerHTML = `<button class="btn" onclick="mejorarNivel3(${pos})">Mejorar Nivel 3 ($100)</button>`;
-                    }
-                } else {
-                    let factor = (prop.nivel == 3) ? 0.5 : 0.2;
-                    let rent = Math.floor(mapa[pos].p * factor);
-                    let jRef = db.ref('salas/' + sala + '/jugadores/' + miIdx);
-                    jRef.once('value', snap => {
-                        let j = snap.val();
-                        let pagado = rent;
-                        jRef.child('dinero').transaction(d => (d || 0) - pagado);
-                        db.ref('salas/' + sala + '/jugadores/' + prop.owner + '/dinero').transaction(d => (d || 0) + pagado);
-                        log("Pagaste $" + pagado + " a " + nombres[prop.owner]);
-                    });
-                }
-            });
-        }
+        let propRef = db.ref('salas/' + sala + '/propiedades/' + pos);
+        propRef.once('value', s => {
+            let prop = s.val();
+            if(!prop && mapa[pos].p > 0) {
+                if(dinero >= mapa[pos].p) div.innerHTML = `<button class="btn" onclick="comprar(${pos})">Comprar $${mapa[pos].p}</button>`;
+            } else if(prop && prop.owner == miIdx) {
+                let costoMejora = mapa[pos].p + 50;
+                if(prop.nivel < 3) div.innerHTML = `<button class="btn" onclick="mejorar(${pos}, ${costoMejora})">Mejorar $${costoMejora}</button>`;
+                else if(prop.nivel == 3) div.innerHTML = `<button class="btn" disabled>Max Nivel</button>`;
+            }
+        });
     }
 
     function comprar(pos) {
         db.ref('salas/' + sala + '/propiedades/' + pos).set({ owner: miIdx, nivel: 1 });
         db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d - mapa[pos].p);
-        log(nombres[miIdx] + " compró " + mapa[pos].n);
+        log("Compraste " + mapa[pos].n);
     }
 
-    function mejorar(pos) {
+    function mejorar(pos, costo) {
         db.ref('salas/' + sala + '/propiedades/' + pos + '/nivel').transaction(n => (n || 1) + 1);
-        db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d - 50);
-        log("Mejorado a nivel 2.");
-    }
-
-    function mejorarNivel3(pos) {
-        db.ref('salas/' + sala + '/propiedades/' + pos + '/nivel').set(3);
-        db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d - 100);
-        log("¡Propiedad mejorada a nivel 3! La renta ahora es del 50%.");
+        db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d - costo);
+        log("Mejoraste propiedad.");
         document.getElementById('acciones').innerHTML = "";
     }
 
