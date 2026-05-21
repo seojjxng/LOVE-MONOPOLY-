@@ -7,23 +7,29 @@
     <style>
         body { background: #fff0f3; font-family: 'Montserrat', sans-serif; display: flex; justify-content: center; padding: 20px; }
         .container { display: flex; gap: 20px; width: 900px; }
-        /* Tablero de 18 casillas */
         .board { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(5, 100px); gap: 5px; background: #ffccd5; padding: 10px; border-radius: 20px; }
         .cell { background: white; border: 2px solid #ffccd5; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #ff59aa; text-align: center; }
         .center-zone { grid-column: 2 / 5; grid-row: 2 / 5; background: #fff5f7; border: 3px dashed #ff80bf; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        /* Sidebar */
         .sidebar { width: 300px; display: flex; flex-direction: column; gap: 10px; }
         .panel { background: white; padding: 15px; border-radius: 15px; border: 2px solid #ffccd5; }
-        #log { height: 200px; overflow-y: auto; font-size: 11px; color: #555; border: 1px solid #eee; padding: 5px; }
-        .btn { width: 100%; padding: 10px; background: #ff59aa; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 5px; }
+        #log { height: 150px; overflow-y: auto; font-size: 11px; color: #555; border: 1px solid #eee; padding: 5px; }
+        .btn { width: 100%; padding: 10px; background: #ff59aa; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        
+        /* Modal estilo Windows Rosa */
+        #modal { display: none; position: fixed; top: 30%; left: 40%; width: 300px; background: #fff0f9; border: 3px solid #ff80bf; padding: 20px; border-radius: 10px; text-align: center; z-index: 100; box-shadow: 5px 5px 15px rgba(0,0,0,0.2); }
     </style>
 </head>
 <body>
 
+<div id="modal">
+    <h3 id="modal-text">¡Ganaste!</h3>
+    <button onclick="document.getElementById('modal').style.display='none'">Cerrar</button>
+</div>
+
 <div class="container">
     <div class="board" id="board">
         <div class="center-zone">
-            <div id="turno-text" style="font-size:12px; font-weight:bold;">ESPERANDO...</div>
+            <div id="turno-text">ESPERANDO...</div>
             <div onclick="tirarDado()" style="font-size: 40px; cursor: pointer;">🎲</div>
             <button class="btn" onclick="comprar()">COMPRAR</button>
         </div>
@@ -31,13 +37,12 @@
 
     <div class="sidebar">
         <div class="panel">
-            <strong>Conexión</strong><br>
-            <input type="text" id="peer-id" placeholder="ID del amigo" style="width:90%">
+            <strong>ID:</strong> <span id="my-id">...</span>
+            <input type="text" id="peer-id" placeholder="ID amigo" style="width:90%">
             <button class="btn" onclick="conectar()">Conectar</button>
-            <div id="my-id" style="font-size: 9px; margin-top:5px;">Generando ID...</div>
         </div>
         <div class="panel">
-            <strong>Historial del Juego</strong>
+            <strong>Historial</strong>
             <div id="log"></div>
         </div>
     </div>
@@ -45,7 +50,7 @@
 
 <script>
     const peer = new Peer();
-    let conn, miTurno = false, miPos = 0, dinero = 1000;
+    let conn, miTurno = false, miPos = 0, dinero = 1000, policiaTurno = false;
     const mapa = [
         {n: "SALIDA", p:0}, {n: "TÉ", p:100}, {n: "SUERTE", p:0}, {n: "BOUTIQUE", p:200}, {n: "HOME", p:0},
         {n: "CAFÉ", p:150}, {n: "PARQUE", p:120}, {n: "POLICÍA", p:0}, {n: "SPA", p:250}, {n: "VILLA 1", p:300},
@@ -53,14 +58,41 @@
         {n: "GYM", p:180}, {n: "VILLA 4", p:250}, {n: "SUERTE", p:0}
     ];
 
-    function log(m) { 
-        const l = document.getElementById('log'); 
-        l.innerHTML += `<div>> ${m}</div>`; 
-        l.scrollTop = l.scrollHeight; 
+    function log(m) { const l = document.getElementById('log'); l.innerHTML += `<div>> ${m}</div>`; l.scrollTop = l.scrollHeight; }
+
+    peer.on('open', id => { document.getElementById('my-id').innerText = id; });
+    peer.on('connection', c => { conn = c; setup(c); });
+
+    function setup(c) {
+        c.on('data', d => {
+            if(d.type === 'MOVE') { miTurno = true; document.getElementById('turno-text').innerText = "TU TURNO"; log("Tu turno!"); }
+        });
     }
 
-    peer.on('open', id => { document.getElementById('my-id').innerText = "Tu ID: " + id; });
-    peer.on('connection', c => { conn = c; setup(c); miTurno = false; });
+    function tirarDado() {
+        if(!miTurno) return log("No es tu turno.");
+        if(policiaTurno) { log("¡Estás en la cárcel! Turno perdido."); policiaTurno = false; miTurno = false; return; }
+
+        let val = Math.floor(Math.random()*6)+1;
+        miPos = (miPos + val) % mapa.length;
+        log("Caíste en " + mapa[miPos].n);
+
+        if(mapa[miPos].n === "SUERTE") activarSuerte();
+        if(mapa[miPos].n === "POLICÍA") { log("¡Caíste en policía! Pierdes tu próximo turno."); policiaTurno = true; }
+
+        if(conn) conn.send({type: 'MOVE', val: val});
+        miTurno = false;
+        document.getElementById('turno-text').innerText = "ESPERANDO...";
+    }
+
+    function activarSuerte() {
+        const premios = [50, 50, 100, 100, 150, 200, 200, 100]; // Ponderado
+        const premio = premios[Math.floor(Math.random() * premios.length)];
+        dinero += premio;
+        document.getElementById('modal-text').innerText = "¡Ganaste $" + premio + "!";
+        document.getElementById('modal').style.display = 'block';
+        log("SUERTE: Ganaste $" + premio);
+    }
 
     function conectar() {
         conn = peer.connect(document.getElementById('peer-id').value);
@@ -69,40 +101,17 @@
         document.getElementById('turno-text').innerText = "TU TURNO";
     }
 
-    function setup(c) {
-        c.on('open', () => log("¡Conectado!"));
-        c.on('data', d => {
-            if(d.type === 'MOVE') {
-                log("Amigo avanzó " + d.val);
-                miTurno = true;
-                document.getElementById('turno-text').innerText = "TU TURNO";
-            }
-        });
-    }
-
-    function tirarDado() {
-        if(!miTurno || !conn) return log("No es tu turno.");
-        let val = Math.floor(Math.random()*6)+1;
-        miPos = (miPos + val) % mapa.length;
-        log("Sacaste " + val + ". Caíste en " + mapa[miPos].n);
-        conn.send({type: 'MOVE', val: val});
-        miTurno = false;
-        document.getElementById('turno-text').innerText = "ESPERANDO...";
-    }
-
     function comprar() {
         if(mapa[miPos].p > 0 && dinero >= mapa[miPos].p) {
             dinero -= mapa[miPos].p;
-            log("Compraste " + mapa[miPos].n + " por $" + mapa[miPos].p);
-        } else log("No se puede comprar.");
+            log("Compraste " + mapa[miPos].n);
+        } else log("No puedes comprar.");
     }
 
-    // Dibujar 18 casillas
     const board = document.getElementById('board');
     mapa.forEach((m, i) => {
         const d = document.createElement('div');
-        d.className = 'cell'; d.id = 'cell-'+i;
-        d.innerHTML = `${m.n}<br>${m.p > 0 ? '$'+m.p : ''}`;
+        d.className = 'cell'; d.innerHTML = `${m.n}<br>${m.p > 0 ? '$'+m.p : ''}`;
         board.appendChild(d);
     });
 </script>
