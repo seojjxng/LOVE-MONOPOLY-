@@ -9,8 +9,6 @@
         .container { display: flex; gap: 25px; width: 950px; }
         .board { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(5, 100px); gap: 8px; background: #ffccd5; padding: 15px; border-radius: 25px; position: relative; }
         .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; cursor: pointer; }
-        .owned-0 { background-color: #add8e6 !important; }
-        .owned-1 { background-color: #ffb6c1 !important; }
         .token { width: 35px; height: 35px; position: absolute; z-index: 10; transition: all 0.5s ease; pointer-events: none; }
         .center-zone { grid-column: 2 / 5; grid-row: 2 / 5; background: #fff5f7; border: 3px dashed #ff80bf; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; }
         .sidebar { width: 320px; display: flex; flex-direction: column; gap: 20px; }
@@ -18,17 +16,11 @@
         .btn { width: 100%; padding: 10px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin: 5px 0; font-size: 12px; }
         .input-field { width: 93%; padding: 8px; margin: 5px 0; border: 1px solid #ffccd5; border-radius: 8px; }
         .dice-img { width: 60px; height: 60px; cursor: pointer; margin: 10px; }
-        #log { height: 300px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; }
-        #notification-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #fff0f9; border: 3px solid #ff80bf; padding: 20px; border-radius: 5px; z-index: 100; box-shadow: 5px 5px 0px #ffccd5; text-align: center; color: #c71585; }
+        #log { height: 150px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; }
+        #chat-log { height: 100px; overflow-y: auto; background: white; border: 1px solid #ffccd5; border-radius: 10px; padding: 10px; font-size: 12px; margin-bottom: 5px; }
     </style>
 </head>
 <body>
-
-<div id="notification-modal">
-    <div id="modal-title" style="font-weight:bold; font-size: 16px; margin-bottom: 5px;"></div>
-    <div id="modal-text" style="font-size: 12px; margin-bottom: 15px;"></div>
-    <button class="btn" onclick="document.getElementById('notification-modal').style.display='none'">OK</button>
-</div>
 
 <div class="container">
     <div class="board" id="board">
@@ -51,6 +43,12 @@
             <button class="btn" onclick="iniciarConexion()">Conectar</button>
             <div id="my-id" style="font-size: 11px; margin-top: 5px;">Iniciando...</div>
         </div>
+        <div class="panel">
+            <strong>Chat</strong>
+            <div id="chat-log"></div>
+            <input type="text" id="chat-input" class="input-field" placeholder="Mensaje...">
+            <button class="btn" onclick="enviarChat()">Enviar</button>
+        </div>
         <div class="panel"><strong>Historial</strong><div id="log"></div></div>
     </div>
 </div>
@@ -59,39 +57,39 @@
     const peer = new Peer();
     let playerNames = ["Dog", "Horse", "Hat", "Car"];
     let myIdx = 0, esHost = false, connections = [];
-    let miPos = [0,0,0,0], miDinero = 1000, juegoIniciado = false;
+    let miPos = [0,0,0,0], hostConn = null;
 
-    const mapa = [
-        {n: "SALIDA", p:0, up:0}, {n: "IGLESIA", p:100, owner:null, up:0}, {n: "?", p:0, up:0}, {n: "BOUTIQUE", p:200, owner:null, up:0}, 
-        {n: "¡A LA CÁRCEL!", p:0, up:0}, {n: "CHEONGDAM", p:500, owner:null, up:0}, {n: "GANGNAM", p:520, owner:null, up:0}, {n: "SEOCHO-GU", p:250, owner:null, up:0}, 
-        {n: "MAPO", p:300, owner:null, up:0}, {n: "INCHEON", p:350, owner:null, up:0}, {n: "JOYAS", p:400, owner:null, up:0}, {n: "CÁRCEL", p:0, up:0}, 
-        {n: "VILLA 3", p:220, owner:null, up:0}, {n: "?", p:0, up:0}, {n: "ARCA COMUNAL", p:0, up:0}, {n: "BUKCHON", p:500, owner:null, up:0}
-    ];
+    const mapa = [{n: "SALIDA"}, {n: "IGLESIA"}, {n: "?"}, {n: "BOUTIQUE"}, {n: "¡A LA CÁRCEL!"}, {n: "CHEONGDAM"}, {n: "GANGNAM"}, {n: "SEOCHO-GU"}, {n: "MAPO"}, {n: "INCHEON"}, {n: "JOYAS"}, {n: "CÁRCEL"}, {n: "VILLA 3"}, {n: "?"}, {n: "ARCA"}, {n: "BUKCHON"}];
 
-    function showModal(t, m) { document.getElementById('modal-title').innerText = t; document.getElementById('modal-text').innerText = m; document.getElementById('notification-modal').style.display = 'block'; }
     function log(m) { const l = document.getElementById('log'); l.innerHTML += `<div>> ${m}</div>`; l.scrollTop = l.scrollHeight; }
+    function chatLog(u, m) { const l = document.getElementById('chat-log'); l.innerHTML += `<div><b>${u}:</b> ${m}</div>`; l.scrollTop = l.scrollHeight; }
 
-    peer.on('open', id => { document.getElementById('my-id').innerText = "ID: " + id; esHost = true; });
+    peer.on('open', id => { document.getElementById('my-id').innerText = "ID: " + id; });
 
     function iniciarConexion() {
-        let targetId = document.getElementById('peer-id').value;
-        let conn = peer.connect(targetId);
+        let conn = peer.connect(document.getElementById('peer-id').value);
+        hostConn = conn;
         setupConn(conn);
     }
 
     peer.on('connection', conn => {
         let newIdx = connections.length + 1;
-        connections.push({conn, id: newIdx});
+        connections.push(conn);
         conn.send({type: 'WELCOME', idx: newIdx});
-        log(playerNames[newIdx] + " se unió a la sala.");
         setupConn(conn);
     });
 
     function setupConn(conn) {
         conn.on('data', d => {
-            if (d.type === 'WELCOME') { myIdx = d.idx; juegoIniciado = true; log("Conectado como " + playerNames[myIdx]); }
-            if (d.type === 'MOVE') { miPos[d.idx] = d.pos; actualizarFichas(); }
+            if (d.type === 'WELCOME') { myIdx = d.idx; log("Te has unido como " + playerNames[myIdx]); }
+            if (d.type === 'MOVE') { miPos[d.idx] = d.pos; actualizarFichas(); broadcast(d); }
+            if (d.type === 'CHAT') { chatLog(d.user, d.msg); broadcast(d); }
         });
+    }
+
+    function broadcast(d) {
+        if(esHost) connections.forEach(c => c.send(d));
+        else if(hostConn) hostConn.send(d);
     }
 
     function actualizarFichas() {
@@ -103,23 +101,28 @@
     }
 
     function tirarDado() {
-        let val = Math.floor(Math.random()*6)+1;
-        miPos[myIdx] = (miPos[myIdx] + val) % mapa.length;
+        miPos[myIdx] = (miPos[myIdx] + Math.floor(Math.random()*6)+1) % 16;
         actualizarFichas();
-        let payload = {type: 'MOVE', idx: myIdx, pos: miPos[myIdx]};
-        if(esHost) connections.forEach(c => c.conn.send(payload));
-        else if(peer.connections) { /* Lógica de retorno al host */ }
+        let d = {type: 'MOVE', idx: myIdx, pos: miPos[myIdx]};
+        broadcast(d);
+    }
+
+    function enviarChat() {
+        let msg = document.getElementById('chat-input').value;
+        let d = {type: 'CHAT', user: playerNames[myIdx], msg: msg};
+        chatLog(playerNames[myIdx], msg);
+        broadcast(d);
+        document.getElementById('chat-input').value = "";
     }
 
     const board = document.getElementById('board');
     mapa.forEach((m, i) => {
         const d = document.createElement('div');
-        d.className = 'cell'; d.id = 'cell-' + i; d.innerHTML = `${m.n}<br>${m.p > 0 ? '$'+m.p : ''}`;
+        d.className = 'cell'; d.id = 'cell-' + i; d.innerHTML = m.n;
         board.appendChild(d);
     });
-
-    function comprar() { log("Comprando..."); }
-    function mejorar() { log("Mejorando..."); }
+    
+    function comprar() {} function mejorar() {}
 </script>
 </body>
 </html>
