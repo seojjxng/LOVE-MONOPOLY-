@@ -55,51 +55,45 @@
 </div>
 
 <script>
-  const peer = new Peer('lovingnaeun202026');
+    // Configuración para mayor estabilidad de conexión
+    const peer = new Peer(undefined, {
+        host: '0.peerjs.com',
+        port: 443,
+        secure: true
+    });
+
     let conn;
 
     peer.on('open', (id) => {
         document.getElementById('my-peer-id').innerText = id;
-        document.getElementById('event-log').innerText = "✅ Listo para jugar";
+        document.getElementById('event-log').innerText = "✅ Listo. Pásale este ID a tu amigo.";
+    });
+
+    peer.on('error', (err) => {
+        document.getElementById('event-log').innerText = "❌ Error: " + err.type;
+        console.error(err);
     });
 
     peer.on('connection', (c) => {
         conn = c;
-        setupConnection();
+        setupEvents();
     });
 
-    function conectarConAmigo() {
+    function conectar() {
         const peerID = document.getElementById('rival-peer-id').value;
         if (!peerID) return;
         conn = peer.connect(peerID);
-        setupConnection();
+        setupEvents();
     }
 
-    function setupConnection() {
+    function setupEvents() {
         conn.on('open', () => {
             document.getElementById('event-log').innerText = "💎 ¡Conexión establecida!";
         });
         conn.on('data', (data) => {
-            alert("Recibiste: " + data);
+            alert("Recibido: " + data);
         });
     }
-
-    function buildBoard() {
-        const boardMesh = document.getElementById('board-mesh');
-        boardMesh.innerHTML = ''; 
-        const center = document.createElement('div');
-        center.className = 'b-cell center-zone';
-        center.innerHTML = `<div class="dice">🎲</div>`;
-        boardMesh.appendChild(center);
-        for(let i=0; i<16; i++) {
-            const div = document.createElement('div');
-            div.className = 'b-cell';
-            div.innerHTML = `<div>VILLA ${i + 1}</div>`;
-            boardMesh.appendChild(div);
-        }
-    }
-
-    document.addEventListener('DOMContentLoaded', buildBoard);
 </script>
 </body>
 </html>
