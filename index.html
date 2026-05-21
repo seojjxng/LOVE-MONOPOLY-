@@ -56,7 +56,7 @@
 <script>
     const peer = new Peer();
     let conn, miTurno = false, miPos = 0, juegoIniciado = false, esHost = false;
-    let miDinero = 1000, jailTurnsCounter = 0;
+    let miDinero = 1000, extraTurnos = 0;
     
     const mapa = [
         {n: "SALIDA", p:0, up:0}, {n: "TÉ", p:100, owner:null, up:0}, {n: "SUERTE", p:0, up:0}, {n: "BOUTIQUE", p:200, owner:null, up:0}, 
@@ -76,38 +76,36 @@
 
     function tirarDado() {
         if(!juegoIniciado || !miTurno) return;
-        
         let val = Math.floor(Math.random()*6)+1;
-        let nuevaPos = miPos + val;
-        
-        if (nuevaPos >= mapa.length) { miDinero += 100; log("Pasaste por SALIDA: +$100"); }
-        miPos = nuevaPos % mapa.length;
-        
+        let nuevaPos = (miPos + val) % mapa.length;
+        if (nuevaPos < miPos) { miDinero += 100; log("Pasaste por SALIDA: +$100"); }
+        miPos = nuevaPos;
         let actual = mapa[miPos];
-        let envioTurno = true; // Por defecto el turno pasa al otro
 
         if (actual.n === "¡A LA CÁRCEL!") {
-            miPos = 11; 
-            jailTurnsCounter = 2; // El jugador pierde este turno y el siguiente
-            log("¡Cárcel! Pierdes 2 turnos.");
-            envioTurno = true; // Cedes el turno al oponente para que él juegue sus 2 turnos
+            miPos = 11;
+            log("¡A LA CÁRCEL! Pierdes el turno.");
+            if(conn) conn.send({type: 'JAIL_EVENT', pos: 11});
+            miTurno = false;
         } else if (actual.n === "SUERTE" || actual.n === "COMUNIDAD") {
             let azar = Math.floor(Math.random() * 200) - 100;
             miDinero += azar;
             showModal(actual.n + ": " + (azar >= 0 ? "+" : "") + azar + "$");
             log(actual.n + ": " + azar + "$");
+            miTurno = false;
         } else if (actual.owner && actual.owner !== (esHost ? 'host' : 'visitante')) {
-            let alquiler = Math.floor(actual.p * (actual.up === 0 ? 0.1 : (actual.up === 1 ? 0.15 : 0.25)));
-            miDinero -= alquiler;
-            log("Pagaste $" + alquiler + " de renta");
-            if(conn) conn.send({type: 'PAY', amount: alquiler});
+            let alq = Math.floor(actual.p * (actual.up === 0 ? 0.1 : (actual.up === 1 ? 0.15 : 0.25)));
+            miDinero -= alq;
+            log("Pagaste $" + alq + " de renta");
+            if(conn) conn.send({type: 'PAY', amount: alq});
+            miTurno = false;
+        } else {
+            miTurno = false;
         }
 
         document.getElementById('dinero-mio').innerText = miDinero;
         moverFichas();
-        if(conn) conn.send({type: 'MOVE', pos: miPos, jail: jailTurnsCounter});
-        
-        miTurno = false;
+        if(conn) conn.send({type: 'MOVE', pos: miPos});
         document.getElementById('turno-text').innerText = "ESPERANDO...";
     }
 
@@ -118,6 +116,7 @@
             actual.owner = esHost ? 'host' : 'visitante';
             document.getElementById('cell-' + miPos).classList.add(esHost ? 'owned-host' : 'owned-visitante');
             document.getElementById('dinero-mio').innerText = miDinero;
+            log("Compraste " + actual.n);
             if(conn) conn.send({type: 'BUY', pos: miPos, owner: actual.owner});
         }
     }
@@ -126,11 +125,7 @@
         let actual = mapa[miPos];
         if(actual.owner === (esHost ? 'host' : 'visitante') && actual.up < 2) {
             let costo = Math.floor(actual.p * 0.5);
-            if(miDinero >= costo) { 
-                miDinero -= costo; actual.up++; 
-                document.getElementById('dinero-mio').innerText = miDinero; 
-                if(conn) conn.send({type: 'UPGRADE', pos: miPos, up: actual.up});
-            }
+            if(miDinero >= costo) { miDinero -= costo; actual.up++; document.getElementById('dinero-mio').innerText = miDinero; log("Mejorado a nivel " + actual.up); if(conn) conn.send({type: 'UPGRADE', pos: miPos, up: actual.up}); }
         }
     }
 
@@ -140,27 +135,12 @@
         conn.on('open', () => { juegoIniciado = true; miTurno = esHost; log("Conectado."); });
         conn.on('data', d => {
             if(d.type === 'MOVE') {
-                const otraFicha = document.getElementById(esHost ? 'p2' : 'p1');
-                const cell = document.getElementById('cell-' + d.pos);
-                if(cell && otraFicha) {
-                    otraFicha.style.left = (cell.offsetLeft + (esHost ? 29 : 31)) + 'px';
-                    otraFicha.style.top = (cell.offsetTop + 30) + 'px';
-                }
-                
-                // Lógica de turnos post-cárcel
-                if(jailTurnsCounter > 0) {
-                    jailTurnsCounter--;
-                    miTurno = false; // Sigue bloqueado
-                    document.getElementById('turno-text').innerText = "EN CÁRCEL...";
-                    if(conn) conn.send({type: 'MOVE', pos: miPos, jail: jailTurnsCounter}); // Mantener bloqueo
-                } else {
-                    miTurno = true;
-                    document.getElementById('turno-text').innerText = "¡TU TURNO!";
-                }
+                miTurno = true; document.getElementById('turno-text').innerText = "¡TU TURNO!";
             }
-            if(d.type === 'PAY') { miDinero += d.amount; document.getElementById('dinero-mio').innerText = miDinero; }
-            if(d.type === 'BUY') { mapa[d.pos].owner = d.owner; document.getElementById('cell-' + d.pos).classList.add(d.owner === 'host' ? 'owned-host' : 'owned-visitante'); }
-            if(d.type === 'UPGRADE') { mapa[d.pos].up = d.up; }
+            if(d.type === 'JAIL_EVENT') { extraTurnos = 2; miTurno = true; document.getElementById('turno-text').innerText = "¡TURNO DOBLE!"; }
+            if(d.type === 'PAY') { miDinero += d.amount; document.getElementById('dinero-mio').innerText = miDinero; log("Recibiste $" + d.amount + " de alquiler."); }
+            if(d.type === 'BUY') { mapa[d.pos].owner = d.owner; document.getElementById('cell-' + d.pos).classList.add(d.owner === 'host' ? 'owned-host' : 'owned-visitante'); log("El otro jugador compró: " + mapa[d.pos].n); }
+            if(d.type === 'UPGRADE') { mapa[d.pos].up = d.up; log("El otro jugador mejoró: " + mapa[d.pos].n); }
         });
     }
 
