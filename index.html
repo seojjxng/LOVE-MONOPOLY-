@@ -81,7 +81,7 @@
     const mapa = [{n:"SALIDA",p:0},{n:"IGLESIA",p:100},{n:"?",p:0},{n:"BOUTIQUE",p:200},{n:"A LA CÁRCEL",p:0},{n:"CHEONGDAM",p:500},{n:"GANGNAM",p:520},{n:"SEOCHO-GU",p:250},{n:"MAPO",p:300},{n:"INCHEON",p:350},{n:"JOYAS",p:400},{n:"CÁRCEL",p:0},{n:"VILLA 3",p:0},{n:"?",p:0},{n:"ARCA",p:0},{n:"BUKCHON",p:500}];
     const eventos = [{txt:"¡Ganaste la lotería!", m:200, g:true}, {txt:"¡Heredaste una fortuna!", m:300, g:true}, {txt:"Debes impuestos sobre la renta", m:150, g:false}, {txt:"Le debes al banco", m:250, g:false}];
 
-    function log(txt) { document.getElementById('log').innerHTML += `<div>${txt}</div>`; }
+    function log(txt) { db.ref('salas/' + sala + '/log').push(txt); }
 
     function unirse() {
         sala = document.getElementById('sala-id').value;
@@ -112,23 +112,21 @@
             if(nuevaPos >= mapa.length) {
                 let ingreso = 100;
                 let deuda = j.deuda || 0;
+                let pago = 0;
                 if(deuda > 0) {
-                    let pago = Math.min(ingreso * 0.5, deuda);
-                    db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ 
-                        dinero: (j.dinero || 0) + (ingreso - pago),
-                        deuda: deuda - pago
-                    });
-                    log("Salida: +$"+ingreso+" (Banco retuvo $"+pago+" de deuda)");
+                    pago = Math.min(ingreso * 0.5, deuda);
+                    db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ dinero: (j.dinero || 0) + (ingreso - pago), deuda: deuda - pago });
+                    log(nombres[miIdx] + " pasó por SALIDA: Banco retuvo $" + pago + " de deuda.");
                 } else {
                     db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => (d || 0) + ingreso);
-                    log("Pasaste por SALIDA: +$100");
+                    log(nombres[miIdx] + " pasó por SALIDA: +$100");
                 }
                 nuevaPos = nuevaPos % mapa.length;
             }
             
             if(nuevaPos === 4) { 
                 db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: 11, enCarcel: true }); 
-                log(nombres[miIdx] + " en cárcel.");
+                log(nombres[miIdx] + " ha sido arrestado.");
             } else { 
                 db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: nuevaPos }); 
                 verificarCasilla(nuevaPos, j.dinero);
@@ -149,8 +147,7 @@
                     return j; 
                 });
                 document.getElementById('modal').style.display = 'none';
-                document.getElementById('contrato-modal').style.display = 'block';
-                log("Préstamo obtenido: +$" + m);
+                log(nombres[miIdx] + " obtuvo un préstamo de $" + m);
             };
             div.appendChild(b);
         });
@@ -160,17 +157,18 @@
     function verificarCasilla(pos, dinero) {
         let div = document.getElementById('acciones'); div.innerHTML = "";
         let propRef = db.ref('salas/' + sala + '/propiedades/' + pos);
+        
         if(pos === 12) {
-            let impuestos = ["Prendas", "Agua", "Luz"];
-            let tipo = impuestos[Math.floor(Math.random()*impuestos.length)];
+            let tipo = ["Prendas", "Agua", "Luz"][Math.floor(Math.random()*3)];
             let monto = Math.floor(Math.random()*101) + 50;
             db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => (d || 0) - monto);
+            log(nombres[miIdx] + " pagó impuesto de " + tipo + ": -$" + monto);
             document.getElementById('modal-title').innerText = "Impuesto: " + tipo;
             document.getElementById('modal-text').innerText = "Debes pagar por " + tipo + ": $" + monto;
             document.getElementById('modal').style.display = 'block';
-            log("Impuesto de " + tipo + ": -$ " + monto);
             return;
         }
+
         propRef.once('value', s => {
             let prop = s.val();
             if(!prop && mapa[pos].p > 0) {
@@ -186,23 +184,23 @@
                     let retencion = Math.floor(pagoReal * 0.5);
                     db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ dinero: (j.dinero || 0) - pagoReal, deuda: (j.deuda || 0) - retencion });
                     db.ref('salas/' + sala + '/jugadores/' + prop.owner + '/dinero').transaction(d => (d || 0) + (pagoReal - retencion));
-                    log("Alquiler pagado: $" + pagoReal + " (Banco retuvo $"+retencion+").");
+                    log(nombres[miIdx] + " pagó $" + pagoReal + " a " + nombres[prop.owner] + " (Banco descontó deuda: $" + retencion + ")");
                 });
             } else if(mapa[pos].n == "?" || mapa[pos].n == "ARCA") {
                 let ev = eventos[Math.floor(Math.random()*eventos.length)];
                 db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => (d || 0) + (ev.g ? ev.m : -ev.m));
+                log(nombres[miIdx] + " " + ev.txt + " ($" + ev.m + ")");
                 document.getElementById('modal-title').innerText = mapa[pos].n;
                 document.getElementById('modal-text').innerText = ev.txt + " ($" + ev.m + ")";
                 document.getElementById('modal').style.display = 'block';
-                log(mapa[pos].n + ": " + ev.txt + " ($" + ev.m + ")");
             }
         });
     }
 
-    function comprar(pos) { db.ref('salas/' + sala + '/propiedades/' + pos).set({ owner: miIdx, nivel: 1 }); db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d - mapa[pos].p); log("Compraste " + mapa[pos].n); document.getElementById('acciones').innerHTML = ""; }
-    function mejorar(pos, costo) { db.ref('salas/' + sala + '/propiedades/' + pos + '/nivel').transaction(n => (n || 1) + 1); db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d - costo); log("Mejoraste propiedad."); document.getElementById('acciones').innerHTML = ""; }
-    function enviarChat() { let msg = document.getElementById('chat-msg').value; let t = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); db.ref('salas/' + sala + '/chat').push({ n: nombres[miIdx], m: msg, t: t }); document.getElementById('chat-msg').value = ""; }
-    function sincronizar() { db.ref('salas/' + sala).on('value', snap => { let s = snap.val(); if(!s) return; document.getElementById('dinero-mio').innerText = s.jugadores[miIdx].dinero; document.getElementById('turno-text').innerText = "Turno de: " + nombres[s.turno]; s.jugadores.forEach((j, i) => { let el = document.getElementById('p' + i); el.style.display = 'block'; let cell = document.getElementById('cell-' + j.pos); if(cell) { el.style.left = (cell.offsetLeft + 15 + (i*8)) + 'px'; el.style.top = (cell.offsetTop + 15) + 'px'; } }); if(s.propiedades) Object.keys(s.propiedades).forEach(p => { let cell = document.getElementById('cell-'+p); if(cell) cell.style.backgroundColor = colores[s.propiedades[p].owner]; }); if(s.chat) { let html = ""; Object.values(s.chat).forEach(c => html += `<div><b>${c.n}</b> [${c.t}]: ${c.m}</div>`); document.getElementById('chat-log').innerHTML = html; } }); }
+    function comprar(pos) { db.ref('salas/' + sala + '/propiedades/' + pos).set({ owner: miIdx, nivel: 1 }); db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d - mapa[pos].p); log(nombres[miIdx] + " compró " + mapa[pos].n); document.getElementById('acciones').innerHTML = ""; }
+    function mejorar(pos, costo) { db.ref('salas/' + sala + '/propiedades/' + pos + '/nivel').transaction(n => (n || 1) + 1); db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d - costo); log(nombres[miIdx] + " mejoró propiedad."); document.getElementById('acciones').innerHTML = ""; }
+    function enviarChat() { let msg = document.getElementById('chat-msg').value; db.ref('salas/' + sala + '/chat').push({ n: nombres[miIdx], m: msg, t: new Date().toLocaleTimeString() }); document.getElementById('chat-msg').value = ""; }
+    function sincronizar() { db.ref('salas/' + sala).on('value', snap => { let s = snap.val(); if(!s) return; document.getElementById('dinero-mio').innerText = s.jugadores[miIdx].dinero; document.getElementById('turno-text').innerText = "Turno: " + nombres[s.turno]; s.jugadores.forEach((j, i) => { let el = document.getElementById('p' + i); el.style.display = 'block'; let cell = document.getElementById('cell-' + j.pos); if(cell) { el.style.left = (cell.offsetLeft + 15 + (i*8)) + 'px'; el.style.top = (cell.offsetTop + 15) + 'px'; } }); if(s.propiedades) Object.keys(s.propiedades).forEach(p => { let cell = document.getElementById('cell-'+p); if(cell) cell.style.backgroundColor = colores[s.propiedades[p].owner]; }); if(s.log) { let html = ""; Object.values(s.log).forEach(l => html += `<div>${l}</div>`); document.getElementById('log').innerHTML = html; } if(s.chat) { let html = ""; Object.values(s.chat).forEach(c => html += `<div><b>${c.n}</b>: ${c.m}</div>`); document.getElementById('chat-log').innerHTML = html; } }); }
     mapa.forEach((m, i) => { const d = document.createElement('div'); d.className = 'cell'; d.id = 'cell-' + i; d.innerHTML = `${m.n}<br>${m.p > 0 ? '$'+m.p : ''}`; document.getElementById('board').appendChild(d); });
 </script>
 </body>
