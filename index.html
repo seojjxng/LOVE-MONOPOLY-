@@ -55,7 +55,7 @@
 
 <script>
     const peer = new Peer();
-    let conn, miTurno = false, miPos = 0, amigoPos = 0, miDinero = 1000, bloqueado = false;
+    let conn, miTurno = false, miPos = 0, amigoPos = 0, miDinero = 1000, bloqueado = false, soyHost = false;
     
     const mapa = [
         {n: "SALIDA", p:0}, {n: "TÉ ($100)", p:100, owner:null, renta: 20}, 
@@ -90,20 +90,11 @@
         if(miPos < prevPos) { miDinero += 100; log("Pasaste por SALIDA: +$100"); }
         
         let casilla = mapa[miPos];
-        log("Caíste en " + casilla.n);
-        
         let proximoBloqueado = false;
+        
         if (casilla.owner && casilla.owner !== 'yo') {
             miDinero -= casilla.renta;
-            log("Pagaste $" + casilla.renta + " de alquiler.");
             if(conn) conn.send({type: 'RENT', amount: casilla.renta});
-        } else if (casilla.n === "SUERTE") {
-            let premio = [50, 100][Math.floor(Math.random()*2)];
-            miDinero += premio;
-            log("Suerte: +$" + premio);
-        } else if (casilla.n === "COMUNIDAD") {
-            miDinero -= 50;
-            log("Servicio Comunitario: -$50");
         } else if (casilla.n.includes("POLICÍA")) {
             proximoBloqueado = true;
             log("¡DETENIDO! Pierdes turno.");
@@ -112,10 +103,10 @@
         document.getElementById('dinero-mio').innerText = miDinero;
         moverFichas();
         
-        // Enviamos el estado de si quedamos bloqueados para que el otro sepa que juega de nuevo
         miTurno = false;
         document.getElementById('turno-text').innerText = "ESPERANDO...";
-        if(conn) conn.send({type: 'MOVE', pos: miPos, money: miDinero, lock: proximoBloqueado});
+        // Enviamos 'lock' para que el otro jugador sepa si debe jugar extra
+        if(conn) conn.send({type: 'MOVE', pos: miPos, lock: proximoBloqueado});
     }
 
     function comprar() {
@@ -125,19 +116,23 @@
             actual.owner = 'yo';
             document.getElementById('cell-' + miPos).classList.add('owned');
             document.getElementById('dinero-mio').innerText = miDinero;
-            log("Compraste " + actual.n);
             if(conn) conn.send({type: 'BUY', pos: miPos});
-        } else log("No puedes comprar.");
+        }
     }
 
     function setupConn() {
         conn.on('data', d => {
-            if(d.type === 'MOVE') { 
-                amigoPos = d.pos; 
-                moverFichas(); 
-                // Si el otro jugador quedó bloqueado (d.lock es true), yo mantengo miTurno en true
-                miTurno = d.lock ? true : true; 
-                document.getElementById('turno-text').innerText = "¡TU TURNO!"; 
+            if(d.type === 'MOVE') {
+                amigoPos = d.pos;
+                moverFichas();
+                // LÓGICA: Si él se bloqueó, yo recupero mi turno (turno extra). 
+                // Si ambos estamos bloqueados (bloqueado es true), el turno vuelve al anterior.
+                if(d.lock && bloqueado) {
+                    miTurno = soyHost; // El host recupera el turno si ambos están en policía
+                } else {
+                    miTurno = true;
+                }
+                document.getElementById('turno-text').innerText = "¡TU TURNO!";
             }
             if(d.type === 'BUY') { mapa[d.pos].owner = 'amigo'; document.getElementById('cell-' + d.pos).classList.add('owned'); }
             if(d.type === 'RENT') { miDinero += d.amount; document.getElementById('dinero-mio').innerText = miDinero; }
@@ -150,10 +145,10 @@
         d.className = 'cell'; d.id = 'cell-' + i; d.innerText = m.n;
         board.appendChild(d);
     });
-    
+
     peer.on('open', id => document.getElementById('my-id').innerText = "ID: " + id);
-    peer.on('connection', c => { conn = c; setupConn(); miTurno = true; document.getElementById('turno-text').innerText = "¡TU TURNO!"; });
-    function conectar() { conn = peer.connect(document.getElementById('peer-id').value); setupConn(); }
+    peer.on('connection', c => { conn = c; setupConn(); miTurno = false; soyHost = true; document.getElementById('turno-text').innerText = "ESPERANDO..."; });
+    function conectar() { conn = peer.connect(document.getElementById('peer-id').value); setupConn(); miTurno = true; soyHost = false; document.getElementById('turno-text').innerText = "¡TU TURNO!"; }
     setTimeout(moverFichas, 500);
 </script>
 </body>
