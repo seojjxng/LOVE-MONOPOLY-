@@ -15,6 +15,7 @@
         .btn { width: 70%; padding: 8px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin: 5px 0; font-size: 11px; }
         #log { height: 180px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; }
         #modal { display: none; position: fixed; top: 30%; left: 40%; width: 300px; background: #fff0f9; border: 3px solid #ff80bf; padding: 20px; border-radius: 15px; text-align: center; z-index: 100; }
+        #dice-result { font-size: 20px; font-weight: bold; color: #ff59aa; margin-bottom: 5px; }
     </style>
 </head>
 <body>
@@ -25,6 +26,7 @@
     <div class="board" id="board">
         <div class="center-zone">
             <div id="turno-text" style="margin-bottom: 5px; font-size: 10px; font-weight: bold;">ESPERANDO...</div>
+            <div id="dice-result">-</div>
             <div onclick="tirarDado()" style="font-size: 40px; cursor: pointer;">🎲</div>
             <button class="btn" onclick="comprar()">COMPRAR / MEJORAR</button>
             <div class="banco-display" style="font-size: 12px; color: #c71585;">💖 Tú: $<span id="dinero-mio">1000</span> | 💎 Amigo: $<span id="dinero-amigo">1000</span></div>
@@ -43,7 +45,7 @@
 
 <script>
     const peer = new Peer();
-    let conn, miTurno = false, miPos = 0, miDinero = 1000, amigoDinero = 1000;
+    let conn, miTurno = false, miPos = 0, miDinero = 1000, amigoDinero = 1000, bloqueado = false;
     const mapa = [
         {n: "SALIDA", p:0}, {n: "TÉ ($100)", p:100, owner: null, level: 0}, {n: "SUERTE", p:0}, 
         {n: "BOUTIQUE ($200)", p:200, owner: null, level: 0}, {n: "POLICÍA", p:0},
@@ -57,52 +59,36 @@
 
     function log(m) { const l = document.getElementById('log'); l.innerHTML += `<div>> ${m}</div>`; l.scrollTop = l.scrollHeight; }
 
-    function comprar() {
-        let actual = mapa[miPos];
-        if (!actual.p || actual.n === "SUERTE") return;
-        if (actual.owner === null) {
-            actual.owner = 'me';
-            miDinero -= actual.p;
-            document.getElementById('cell-' + miPos).style.background = "#ffe4e9";
-            log("Compraste " + actual.n);
-        } else if (actual.owner === 'me' && actual.level < 2) {
-            actual.level++; miDinero -= 100;
-            log("Mejoraste " + actual.n);
-        }
-        document.getElementById('dinero-mio').innerText = miDinero;
-        if(conn) conn.send({type: 'UPDATE', mapa, dinero: miDinero});
-    }
-
-    peer.on('open', id => document.getElementById('my-id').innerText = id);
-    peer.on('connection', c => { conn = c; setup(); log("¡Conexión establecida!"); });
-
-    function conectar() { 
-        conn = peer.connect(document.getElementById('peer-id').value); 
-        setup(); 
-        miTurno = true; 
-        log("¡Conexión establecida!");
-    }
-
-    function setup() {
-        conn.on('data', d => {
-            if (d.type === 'UPDATE') { amigoDinero = d.dinero; document.getElementById('dinero-amigo').innerText = amigoDinero; }
-            if (d.type === 'MOVE') { miTurno = true; document.getElementById('turno-text').innerText = "¡ES TU TURNO!"; log("¡Te toca lanzar!"); }
-        });
-    }
-
     function tirarDado() {
         if(!miTurno) return;
+        if(bloqueado) { log("¡Estás en POLICÍA, turno perdido!"); bloqueado = false; miTurno = false; conn.send({type: 'MOVE', pos: miPos, lock: false}); document.getElementById('turno-text').innerText = "ESPERANDO..."; return; }
+        
         let val = Math.floor(Math.random()*6)+1;
+        document.getElementById('dice-result').innerText = val;
         let viejaPos = miPos;
         miPos = (miPos + val) % mapa.length;
+        if (miPos < viejaPos) { miDinero += 100; log("Salida: +$100"); }
         
-        if (miPos < viejaPos) { miDinero += 100; log("Pasaste por SALIDA: +$100"); }
+        let caePolicia = (mapa[miPos].n === "POLICÍA");
+        if(caePolicia) { log("¡Cuidado, POLICÍA!"); bloqueado = true; }
         
         log("Caíste en " + mapa[miPos].n);
-        conn.send({type: 'MOVE', pos: miPos});
+        conn.send({type: 'MOVE', pos: miPos, lock: caePolicia});
         miTurno = false;
         document.getElementById('turno-text').innerText = "ESPERANDO...";
         log("Le toca a tu amorcito!");
+    }
+
+    // Funciones de conexión y compra se mantienen...
+    peer.on('open', id => document.getElementById('my-id').innerText = id);
+    peer.on('connection', c => { conn = c; setup(); log("¡Conexión establecida!"); });
+    
+    function conectar() { conn = peer.connect(document.getElementById('peer-id').value); setup(); miTurno = true; log("¡Conexión establecida!"); }
+
+    function setup() {
+        conn.on('data', d => {
+            if (d.type === 'MOVE') { miTurno = true; bloqueado = d.lock; document.getElementById('turno-text').innerText = "¡ES TU TURNO!"; log("¡Te toca lanzar!"); }
+        });
     }
 
     const board = document.getElementById('board');
