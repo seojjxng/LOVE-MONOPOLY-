@@ -87,26 +87,32 @@
             log("¡A LA CÁRCEL! Pierdes el turno.");
             if(conn) conn.send({type: 'JAIL_EVENT', pos: 11});
             miTurno = false;
-        } else if (actual.n === "SUERTE" || actual.n === "COMUNIDAD") {
-            let azar = Math.floor(Math.random() * 200) - 100;
-            miDinero += azar;
-            showModal(actual.n + ": " + (azar >= 0 ? "+" : "") + azar + "$");
-            log(actual.n + ": " + azar + "$");
-            miTurno = false;
-        } else if (actual.owner && actual.owner !== (esHost ? 'host' : 'visitante')) {
-            let alq = Math.floor(actual.p * (actual.up === 0 ? 0.1 : (actual.up === 1 ? 0.15 : 0.25)));
-            miDinero -= alq;
-            log("Pagaste $" + alq + " de renta");
-            if(conn) conn.send({type: 'PAY', amount: alq});
-            miTurno = false;
         } else {
-            miTurno = false;
+            if (actual.n === "SUERTE" || actual.n === "COMUNIDAD") {
+                let azar = Math.floor(Math.random() * 200) - 100;
+                miDinero += azar;
+                showModal(actual.n + ": " + (azar >= 0 ? "+" : "") + azar + "$");
+                log(actual.n + ": " + azar + "$");
+            } else if (actual.owner && actual.owner !== (esHost ? 'host' : 'visitante')) {
+                let alq = Math.floor(actual.p * (actual.up === 0 ? 0.1 : (actual.up === 1 ? 0.15 : 0.25)));
+                miDinero -= alq;
+                log("Pagaste $" + alq + " de renta");
+                if(conn) conn.send({type: 'PAY', amount: alq});
+            }
+            
+            if (extraTurnos > 0) {
+                extraTurnos--;
+                miTurno = true;
+                document.getElementById('turno-text').innerText = "¡TURNO DOBLE (" + extraTurnos + ")!";
+            } else {
+                miTurno = false;
+                document.getElementById('turno-text').innerText = "ESPERANDO...";
+            }
         }
 
         document.getElementById('dinero-mio').innerText = miDinero;
         moverFichas();
         if(conn) conn.send({type: 'MOVE', pos: miPos});
-        document.getElementById('turno-text').innerText = "ESPERANDO...";
     }
 
     function comprar() {
@@ -141,7 +147,9 @@
                     otraFicha.style.left = (cell.offsetLeft + (esHost ? 29 : 31)) + 'px';
                     otraFicha.style.top = (cell.offsetTop + 30) + 'px';
                 }
-                miTurno = true; document.getElementById('turno-text').innerText = "¡TU TURNO!";
+                if (extraTurnos === 0) {
+                    miTurno = true; document.getElementById('turno-text').innerText = "¡TU TURNO!";
+                }
             }
             if(d.type === 'JAIL_EVENT') { 
                 const otraFicha = document.getElementById(esHost ? 'p2' : 'p1');
