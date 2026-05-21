@@ -73,25 +73,46 @@
         if(!juegoIniciado || !miTurno) return;
         let val = Math.floor(Math.random()*6)+1;
         let nuevaPos = miPos + val;
+        
         if (nuevaPos >= mapa.length) { miDinero += 100; log("Pasaste por SALIDA: +$100"); }
         miPos = nuevaPos % mapa.length;
         let actual = mapa[miPos];
-        if (actual.n === "SUERTE" || actual.n === "COMUNIDAD") {
+
+        // Lógica de Cárcel
+        if (actual.n === "¡A LA CÁRCEL!") {
+            miPos = 11; // Posición de POLICÍA
+            log("¡A LA CÁRCEL! Turno perdido.");
+            alert("¡Oh no! Has sido enviado a la POLICÍA. Pierdes tu turno y el otro jugador recibe dos turnos seguidos.");
+            if(conn) conn.send({type: 'MOVE', pos: miPos, jail: true});
+            miTurno = false;
+            document.getElementById('turno-text').innerText = "ESPERANDO...";
+        } 
+        // Lógica de Suerte
+        else if (actual.n === "SUERTE") {
             let azar = Math.floor(Math.random() * 200) - 100;
             miDinero += azar;
-            log("Casilla " + actual.n + ": " + (azar >= 0 ? "+" : "") + azar + "$");
-        } else if (actual.owner && actual.owner !== (esHost ? 'host' : 'visitante')) {
+            alert("CARTA DE SUERTE: " + (azar >= 0 ? "¡Has ganado " : "Has perdido ") + Math.abs(azar) + "$ por causas del destino.");
+            log("Suerte: " + azar + "$");
+        }
+        // Lógica de Comunidad
+        else if (actual.n === "COMUNIDAD") {
+            let pago = 80;
+            miDinero -= pago;
+            alert("CARTA DE COMUNIDAD: Has tenido que pagar " + pago + "$ por mantenimiento de servicios públicos.");
+            log("Comunidad: -$80");
+        }
+        // Lógica de Alquiler
+        else if (actual.owner && actual.owner !== (esHost ? 'host' : 'visitante')) {
             let mult = actual.up === 0 ? 0.1 : (actual.up === 1 ? 0.15 : 0.25);
             let alquiler = Math.floor(actual.p * mult);
             miDinero -= alquiler;
             log("Pagaste $" + alquiler + " de renta");
             if(conn) conn.send({type: 'PAY', amount: alquiler});
         }
+
         document.getElementById('dinero-mio').innerText = miDinero;
         moverFichas();
-        if(conn) conn.send({type: 'MOVE', pos: miPos});
-        miTurno = false;
-        document.getElementById('turno-text').innerText = "ESPERANDO...";
+        if(conn && actual.n !== "¡A LA CÁRCEL!") conn.send({type: 'MOVE', pos: miPos});
     }
 
     function comprar() {
@@ -125,7 +146,9 @@
                     otraFicha.style.left = (cell.offsetLeft + (esHost ? 29 : 31)) + 'px';
                     otraFicha.style.top = (cell.offsetTop + 30) + 'px';
                 }
-                miTurno = true; document.getElementById('turno-text').innerText = "¡TU TURNO!";
+                // Si el otro fue a la cárcel, el receptor recibe 2 turnos (miTurno = true por defecto)
+                miTurno = d.jail ? true : true; 
+                document.getElementById('turno-text').innerText = "¡TU TURNO!";
             }
             if(d.type === 'PAY') { miDinero += d.amount; document.getElementById('dinero-mio').innerText = miDinero; }
         });
