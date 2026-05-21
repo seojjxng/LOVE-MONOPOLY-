@@ -8,7 +8,7 @@
         body { background: #fff0f3; font-family: 'Montserrat', sans-serif; display: flex; justify-content: center; padding: 20px; color: #c71585; }
         .container { display: flex; gap: 25px; width: 950px; }
         .board { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(5, 100px); gap: 8px; background: #ffccd5; padding: 15px; border-radius: 25px; position: relative; }
-        .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; cursor: pointer; transition: 0.3s; }
+        .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; cursor: pointer; }
         .owned-host { background-color: #add8e6 !important; }
         .owned-visitante { background-color: #ffb6c1 !important; }
         .token { width: 35px; height: 35px; position: absolute; z-index: 10; transition: all 0.5s ease; pointer-events: none; }
@@ -19,9 +19,17 @@
         .input-field { width: 93%; padding: 8px; margin: 5px 0; border: 1px solid #ffccd5; border-radius: 8px; }
         .dice-img { width: 60px; height: 60px; cursor: pointer; margin: 10px; }
         #log { height: 300px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; }
+        
+        /* Ventana Rosa Windows */
+        #notification-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #fff0f9; border: 3px solid #ff80bf; padding: 20px; border-radius: 5px; z-index: 100; box-shadow: 5px 5px 0px #ffccd5; text-align: center; color: #c71585; }
     </style>
 </head>
 <body>
+
+<div id="notification-modal">
+    <div id="modal-text" style="font-weight:bold; margin-bottom: 10px;"></div>
+    <button class="btn" onclick="document.getElementById('notification-modal').style.display='none'">OK</button>
+</div>
 
 <div class="container">
     <div class="board" id="board">
@@ -49,7 +57,7 @@
 <script>
     const peer = new Peer();
     let conn, miTurno = false, miPos = 0, juegoIniciado = false, esHost = false;
-    let miDinero = 1000;
+    let miDinero = 1000, turnsInJail = 0, opponentJailTurns = 0;
     
     const mapa = [
         {n: "SALIDA", p:0, up:0}, {n: "TÉ", p:100, owner:null, up:0}, {n: "SUERTE", p:0, up:0}, {n: "BOUTIQUE", p:200, owner:null, up:0}, 
@@ -58,6 +66,7 @@
         {n: "VILLA 3", p:220, owner:null, up:0}, {n: "SUERTE", p:0, up:0}, {n: "COMUNIDAD", p:0, up:0}, {n: "VIVIENDA", p:500, owner:null, up:0}
     ];
 
+    function showModal(msg) { document.getElementById('modal-text').innerText = msg; document.getElementById('notification-modal').style.display = 'block'; }
     function log(m) { const l = document.getElementById('log'); l.innerHTML += `<div>> ${m}</div>`; l.scrollTop = l.scrollHeight; }
 
     function moverFichas() {
@@ -67,20 +76,26 @@
     }
 
     function tirarDado() {
-        if(!juegoIniciado || !miTurno) return;
+        if(!juegoIniciado || !miTurno || turnsInJail > 0) return;
         let val = Math.floor(Math.random()*6)+1;
         let nuevaPos = miPos + val;
+        
         if (nuevaPos >= mapa.length) { miDinero += 100; log("Pasaste por SALIDA: +$100"); }
         miPos = nuevaPos % mapa.length;
+        
         let actual = mapa[miPos];
-
-        if (actual.n === "SUERTE" || actual.n === "COMUNIDAD") {
+        if (actual.n === "¡A LA CÁRCEL!") {
+            miPos = 11; // Policia
+            turnsInJail = 1;
+            log("¡Cárcel! Esperarás 1 turno.");
+            if(conn) conn.send({type: 'JAIL', turns: 2}); // Avisa al otro que juegue 2
+        } else if (actual.n === "SUERTE" || actual.n === "COMUNIDAD") {
             let azar = Math.floor(Math.random() * 200) - 100;
             miDinero += azar;
-            log("Casilla " + actual.n + ": " + (azar >= 0 ? "+" : "") + azar + "$");
+            showModal(actual.n + ": " + (azar >= 0 ? "+" : "") + azar + "$");
+            log(actual.n + ": " + azar + "$");
         } else if (actual.owner && actual.owner !== (esHost ? 'host' : 'visitante')) {
-            let mult = actual.up === 0 ? 0.1 : (actual.up === 1 ? 0.15 : 0.25);
-            let alquiler = Math.floor(actual.p * mult);
+            let alquiler = Math.floor(actual.p * (actual.up === 0 ? 0.1 : (actual.up === 1 ? 0.15 : 0.25)));
             miDinero -= alquiler;
             log("Pagaste $" + alquiler + " de renta");
             if(conn) conn.send({type: 'PAY', amount: alquiler});
@@ -100,7 +115,6 @@
             actual.owner = esHost ? 'host' : 'visitante';
             document.getElementById('cell-' + miPos).classList.add(esHost ? 'owned-host' : 'owned-visitante');
             document.getElementById('dinero-mio').innerText = miDinero;
-            log("Compraste " + actual.n);
             if(conn) conn.send({type: 'BUY', pos: miPos, owner: actual.owner});
         }
     }
@@ -112,7 +126,6 @@
             if(miDinero >= costo) { 
                 miDinero -= costo; actual.up++; 
                 document.getElementById('dinero-mio').innerText = miDinero; 
-                log("Mejorado a nivel " + actual.up);
                 if(conn) conn.send({type: 'UPGRADE', pos: miPos, up: actual.up});
             }
         }
@@ -130,18 +143,19 @@
                     otraFicha.style.left = (cell.offsetLeft + (esHost ? 29 : 31)) + 'px';
                     otraFicha.style.top = (cell.offsetTop + 30) + 'px';
                 }
-                miTurno = true; document.getElementById('turno-text').innerText = "¡TU TURNO!";
+                if(opponentJailTurns > 0) {
+                    opponentJailTurns--;
+                    miTurno = true; // El otro sigue jugando
+                } else {
+                    miTurno = true;
+                    if(turnsInJail > 0) turnsInJail--;
+                }
+                document.getElementById('turno-text').innerText = miTurno ? "¡TU TURNO!" : "ESPERANDO...";
             }
+            if(d.type === 'JAIL') { opponentJailTurns = d.turns; }
             if(d.type === 'PAY') { miDinero += d.amount; document.getElementById('dinero-mio').innerText = miDinero; }
-            if(d.type === 'BUY') { 
-                mapa[d.pos].owner = d.owner; 
-                document.getElementById('cell-' + d.pos).classList.add(d.owner === 'host' ? 'owned-host' : 'owned-visitante');
-                log("El otro jugador compró: " + mapa[d.pos].n);
-            }
-            if(d.type === 'UPGRADE') { 
-                mapa[d.pos].up = d.up; 
-                log("Propiedad mejorada a nivel " + d.up);
-            }
+            if(d.type === 'BUY') { mapa[d.pos].owner = d.owner; document.getElementById('cell-' + d.pos).classList.add(d.owner === 'host' ? 'owned-host' : 'owned-visitante'); }
+            if(d.type === 'UPGRADE') { mapa[d.pos].up = d.up; }
         });
     }
 
