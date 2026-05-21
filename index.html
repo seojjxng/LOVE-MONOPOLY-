@@ -7,7 +7,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <style>
         body { background: #fff0f3; font-family: 'Montserrat', sans-serif; display: flex; justify-content: center; padding: 20px; color: #c71585; }
-        .container { display: flex; gap: 25px; width: 950px; }
+        .container { display: flex; gap: 25px; width: 1000px; }
         .board { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(5, 100px); gap: 8px; background: #ffccd5; padding: 15px; border-radius: 25px; position: relative; }
         .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; }
         .token { width: 35px; height: 35px; position: absolute; z-index: 10; transition: all 0.5s ease; pointer-events: none; }
@@ -16,7 +16,7 @@
         .panel { background: #fff0f9; padding: 20px; border-radius: 20px; border: 2px solid #ffccd5; }
         .btn { width: 100%; padding: 10px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin: 5px 0; font-size: 12px; }
         .input-field { width: 93%; padding: 8px; margin: 5px 0; border: 1px solid #ffccd5; border-radius: 8px; }
-        #log { height: 300px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; }
+        #log, #chat-log { height: 150px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; margin-bottom: 10px; }
         #modal { display: none; position: fixed; top: 20%; left: 35%; width: 300px; background: #ffe4e9; padding: 20px; border: 3px solid #ff80bf; border-radius: 15px; text-align: center; z-index: 999; box-shadow: 5px 5px 15px rgba(0,0,0,0.1); }
         #dado-valor { font-size: 24px; font-weight: bold; margin: 10px 0; }
     </style>
@@ -42,6 +42,12 @@
             <strong>Unirse a Sala</strong>
             <input type="text" id="sala-id" class="input-field" placeholder="Nombre de la sala">
             <button class="btn" onclick="unirse()">Entrar a Juego</button>
+        </div>
+        <div class="panel">
+            <strong>Chat</strong>
+            <div id="chat-log"></div>
+            <input type="text" id="chat-msg" class="input-field" placeholder="Escribe algo...">
+            <button class="btn" onclick="enviarChat()">Enviar</button>
         </div>
         <div class="panel"><strong>Historial</strong><div id="log"></div></div>
     </div>
@@ -70,9 +76,8 @@
         refJugadores.once('value', snap => {
             miIdx = snap.numChildren();
             if(miIdx > 3) return;
-            refJugadores.child(miIdx).set({ pos: 0, dinero: 1000, activo: true });
+            refJugadores.child(miIdx).set({ pos: 0, dinero: 1000, enCarcel: false });
             if(miIdx == 0) db.ref('salas/' + sala + '/turno').set(0);
-            log(nombres[miIdx] + " entró a la sala.");
             sincronizar();
         });
     }
@@ -80,18 +85,33 @@
     function tirarDado() {
         if(miIdx === -1) return;
         db.ref('salas/' + sala).once('value', snap => {
-            if(snap.val().turno !== miIdx) return;
+            let s = snap.val();
+            if(s.turno !== miIdx) return;
+            
+            if(s.jugadores[miIdx].enCarcel) {
+                db.ref('salas/' + sala + '/jugadores/' + miIdx + '/enCarcel').set(false);
+                pasarTurno(s); return;
+            }
+
             let val = Math.floor(Math.random()*6)+1;
             document.getElementById('dado-valor').innerText = val;
-            let j = snap.val().jugadores[miIdx];
+            let j = s.jugadores[miIdx];
             let pos = (j.pos + val) % mapa.length;
-            if(pos === 4) { pos = 11; log("¡" + nombres[miIdx] + " fue a la cárcel!"); }
-            if(pos < j.pos) j.dinero += 100;
-            db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: pos, dinero: j.dinero });
+            
+            if(pos === 4) { 
+                db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: 11, enCarcel: true });
+                log(nombres[miIdx] + " en la cárcel.");
+            } else {
+                if(pos < j.pos) j.dinero += 100;
+                db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: pos, dinero: j.dinero });
+            }
             verificarCasilla(pos, j.dinero);
-            let numJugadores = snap.val().jugadores.length;
-            db.ref('salas/' + sala + '/turno').set((snap.val().turno + 1) % numJugadores);
+            pasarTurno(s);
         });
+    }
+
+    function pasarTurno(s) {
+        db.ref('salas/' + sala + '/turno').set((s.turno + 1) % s.jugadores.length);
     }
 
     function verificarCasilla(pos, dinero) {
@@ -105,64 +125,49 @@
             document.getElementById('modal').style.display = 'block';
         } else if (mapa[pos].p > 0) {
             db.ref('salas/' + sala + '/propiedades/' + pos).once('value', s => {
-                if(!s.exists()) {
-                    div.innerHTML = `<button class="btn" onclick="comprar(${pos})">Comprar $${mapa[pos].p}</button>`;
-                } else if(s.val().owner == miIdx && s.val().nivel < 3) {
-                    div.innerHTML = `<button class="btn" onclick="mejorar(${pos})">Mejorar $50</button>`;
-                } else if(s.val().owner != miIdx) {
-                    let rent = Math.floor(mapa[pos].p * (s.val().nivel === 1 ? 0.1 : s.val().nivel === 2 ? 0.15 : 0.25));
-                    log("Alquiler pagado: $" + rent);
-                }
+                if(!s.exists()) div.innerHTML = `<button class="btn" onclick="comprar(${pos})">Comprar $${mapa[pos].p}</button>`;
+                else if(s.val().owner == miIdx && s.val().nivel < 3) div.innerHTML = `<button class="btn" onclick="mejorar(${pos})">Mejorar $50</button>`;
             });
         }
     }
 
+    function enviarChat() {
+        let msg = document.getElementById('chat-msg').value;
+        let hora = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        db.ref('salas/' + sala + '/chat').push({ n: nombres[miIdx], m: msg, t: hora });
+        document.getElementById('chat-msg').value = "";
+    }
+
     function comprar(pos) {
-        db.ref('salas/' + sala + '/propiedades/' + pos).transaction(s => {
-            if (s) return; // Ya existe, abortar
-            return { owner: miIdx, nivel: 1 };
-        }, (err, committed) => {
-            if(committed) {
-                db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d - mapa[pos].p);
-                log(nombres[miIdx] + " compró " + mapa[pos].n);
-            }
-        });
+        db.ref('salas/' + sala + '/propiedades/' + pos).transaction(s => { if(s) return; return { owner: miIdx, nivel: 1 }; });
+        db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d - mapa[pos].p);
     }
 
     function mejorar(pos) {
         db.ref('salas/' + sala + '/propiedades/' + pos + '/nivel').transaction(n => (n || 1) + 1);
         db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d - 50);
-        log(nombres[miIdx] + " mejoró su propiedad.");
     }
 
     function sincronizar() {
         db.ref('salas/' + sala).on('value', snap => {
-            let s = snap.val();
-            if(!s || !s.jugadores) return;
+            let s = snap.val(); if(!s || !s.jugadores) return;
             document.getElementById('dinero-mio').innerText = s.jugadores[miIdx].dinero;
-            document.getElementById('turno-text').innerText = (s.turno == miIdx) ? "¡ES TU TURNO!" : "Esperando a " + (nombres[s.turno] || "Jugador");
+            document.getElementById('turno-text').innerText = (s.turno == miIdx) ? (s.jugadores[miIdx].enCarcel ? "¡EN LA CÁRCEL!" : "¡ES TU TURNO!") : "Esperando a " + nombres[s.turno];
+            
             s.jugadores.forEach((j, i) => {
                 let el = document.getElementById('p' + i);
-                if(el) {
-                    el.style.display = 'block';
-                    let cell = document.getElementById('cell-' + j.pos);
-                    if(cell) { el.style.left = (cell.offsetLeft + 15 + (i*8)) + 'px'; el.style.top = (cell.offsetTop + 15) + 'px'; }
-                }
+                if(el) { el.style.display = 'block'; let cell = document.getElementById('cell-' + j.pos); if(cell) { el.style.left = (cell.offsetLeft + 15 + (i*8)) + 'px'; el.style.top = (cell.offsetTop + 15) + 'px'; } }
             });
-            if(s.propiedades) {
-                Object.keys(s.propiedades).forEach(p => {
-                    let cell = document.getElementById('cell-'+p);
-                    if(cell) cell.style.backgroundColor = colores[s.propiedades[p].owner];
-                });
+            if(s.chat) {
+                let html = ""; Object.values(s.chat).forEach(c => html += `<div><b>${c.n}</b> [${c.t}]: ${c.m}</div>`);
+                document.getElementById('chat-log').innerHTML = html;
             }
         });
     }
 
-    const board = document.getElementById('board');
     mapa.forEach((m, i) => {
-        const d = document.createElement('div');
-        d.className = 'cell'; d.id = 'cell-' + i; d.innerHTML = `${m.n}<br>${m.p > 0 ? '$'+m.p : ''}`;
-        board.appendChild(d);
+        const d = document.createElement('div'); d.className = 'cell'; d.id = 'cell-' + i; d.innerHTML = `${m.n}<br>${m.p > 0 ? '$'+m.p : ''}`;
+        document.getElementById('board').appendChild(d);
     });
 </script>
 </body>
