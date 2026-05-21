@@ -61,38 +61,49 @@
 
     const mapa = [{n: "SALIDA"}, {n: "IGLESIA"}, {n: "?"}, {n: "BOUTIQUE"}, {n: "¡A LA CÁRCEL!"}, {n: "CHEONGDAM"}, {n: "GANGNAM"}, {n: "SEOCHO-GU"}, {n: "MAPO"}, {n: "INCHEON"}, {n: "JOYAS"}, {n: "CÁRCEL"}, {n: "VILLA 3"}, {n: "?"}, {n: "ARCA"}, {n: "BUKCHON"}];
 
-    function log(m) { const l = document.getElementById('log'); l.innerHTML += `<div>> ${m}</div>`; l.scrollTop = l.scrollHeight; }
-    function chatLog(u, m) { const l = document.getElementById('chat-log'); l.innerHTML += `<div><b>${u}:</b> ${m}</div>`; l.scrollTop = l.scrollHeight; }
-
     peer.on('open', id => { document.getElementById('my-id').innerText = "ID: " + id; esHost = true; });
 
-    function iniciarConexion() {
-        let conn = peer.connect(document.getElementById('peer-id').value);
-        hostConn = conn;
-        esHost = false; 
-        setupConn(conn);
-    }
-
+    // Lógica única de conexión
     peer.on('connection', conn => {
         let newIdx = connections.length + 1;
         if(newIdx > 3) return;
         connections.push(conn);
-        conn.send({type: 'WELCOME', idx: newIdx});
         setupConn(conn);
-        notifyAll({type: 'LOG', msg: playerNames[newIdx] + " se ha unido a la sala"});
+        conn.send({type: 'WELCOME', idx: newIdx, pos: miPos});
+        notifyAll({type: 'LOG', msg: playerNames[newIdx] + " se ha unido"});
     });
 
     function setupConn(conn) {
         conn.on('data', d => {
-            if (d.type === 'WELCOME') { myIdx = d.idx; log("Te has unido como " + playerNames[myIdx]); }
-            if (d.type === 'MOVE') { miPos[d.idx] = d.pos; actualizarFichas(); if(esHost) broadcast(d); }
+            if (d.type === 'WELCOME') { myIdx = d.idx; miPos = d.pos; log("Te has unido como " + playerNames[myIdx]); }
+            if (d.type === 'SYNC') { miPos = d.pos; actualizarFichas(); }
             if (d.type === 'CHAT') { chatLog(d.user, d.msg); if(esHost) broadcast(d); }
+            if (d.type === 'MOVE_REQUEST') { 
+                miPos[d.idx] = d.val; 
+                broadcast({type: 'SYNC', pos: miPos}); 
+                actualizarFichas(); 
+            }
             if (d.type === 'LOG') { log(d.msg); if(esHost) broadcast(d); }
         });
     }
 
+    function iniciarConexion() {
+        hostConn = peer.connect(document.getElementById('peer-id').value);
+        esHost = false;
+        setupConn(hostConn);
+    }
+
     function broadcast(d) { connections.forEach(c => c.send(d)); }
     function notifyAll(d) { log(d.msg); broadcast(d); }
+
+    function sincronizarEstado() {
+        if(esHost) {
+            actualizarFichas();
+            broadcast({type: 'SYNC', pos: miPos});
+        } else {
+            hostConn.send({type: 'MOVE_REQUEST', idx: myIdx, val: miPos[myIdx]});
+        }
+    }
 
     function actualizarFichas() {
         miPos.forEach((p, i) => {
@@ -104,9 +115,7 @@
 
     function tirarDado() {
         miPos[myIdx] = (miPos[myIdx] + Math.floor(Math.random()*6)+1) % 16;
-        actualizarFichas();
-        let d = {type: 'MOVE', idx: myIdx, pos: miPos[myIdx]};
-        if(esHost) broadcast(d); else hostConn.send(d);
+        sincronizarEstado();
     }
 
     function enviarChat() {
@@ -117,6 +126,7 @@
         document.getElementById('chat-input').value = "";
     }
 
+    // Inicializar Tablero
     const board = document.getElementById('board');
     mapa.forEach((m, i) => {
         const d = document.createElement('div');
