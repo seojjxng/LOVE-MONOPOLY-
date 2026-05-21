@@ -44,8 +44,6 @@
 <script>
     const peer = new Peer();
     let conn, miTurno = false, miPos = 0, miDinero = 1000, amigoDinero = 1000;
-    
-    // Configuración del tablero con lógica de propiedad
     const mapa = [
         {n: "SALIDA", p:0}, {n: "TÉ ($100)", p:100, owner: null, level: 0}, {n: "SUERTE", p:0}, 
         {n: "BOUTIQUE ($200)", p:200, owner: null, level: 0}, {n: "POLICÍA", p:0},
@@ -62,49 +60,32 @@
     function comprar() {
         let actual = mapa[miPos];
         if (!actual.p || actual.n === "SUERTE") return;
-
         if (actual.owner === null) {
             actual.owner = 'me';
             miDinero -= actual.p;
             document.getElementById('cell-' + miPos).style.background = "#ffe4e9";
             log("Compraste " + actual.n);
         } else if (actual.owner === 'me' && actual.level < 2) {
-            actual.level++;
-            miDinero -= 100;
-            log("Mejoraste " + actual.n + " a nivel " + actual.level);
+            actual.level++; miDinero -= 100;
+            log("Mejoraste " + actual.n);
         }
         document.getElementById('dinero-mio').innerText = miDinero;
         if(conn) conn.send({type: 'UPDATE', mapa, dinero: miDinero});
     }
 
-    function cobrarRenta(pos) {
-        let prop = mapa[pos];
-        if (prop.owner === 'amigo') {
-            let pct = prop.level === 0 ? 0.15 : (prop.level === 1 ? 0.25 : 0.50);
-            let renta = Math.floor(prop.p * pct);
-            miDinero -= renta;
-            log("Pagaste $" + renta + " de renta a tu amorcito.");
-            document.getElementById('dinero-mio').innerText = miDinero;
-            conn.send({type: 'RENT', amount: renta});
-        }
-    }
-
-    // Inicialización y eventos
     peer.on('open', id => document.getElementById('my-id').innerText = id);
-    peer.on('connection', c => { conn = c; setup(); });
+    peer.on('connection', c => { conn = c; setup(); log("¡Conexión establecida!"); });
 
-    function conectar() { conn = peer.connect(document.getElementById('peer-id').value); setup(); miTurno = true; }
+    function conectar() { 
+        conn = peer.connect(document.getElementById('peer-id').value); 
+        setup(); 
+        miTurno = true; 
+        log("¡Conexión establecida!");
+    }
 
     function setup() {
         conn.on('data', d => {
-            if (d.type === 'UPDATE') { 
-                // Actualizar tablero del otro jugador
-                d.mapa.forEach((m, i) => {
-                    if (m.owner === 'me') document.getElementById('cell-' + i).style.background = "#ff80bf";
-                });
-                amigoDinero = d.dinero; 
-                document.getElementById('dinero-amigo').innerText = amigoDinero;
-            }
+            if (d.type === 'UPDATE') { amigoDinero = d.dinero; document.getElementById('dinero-amigo').innerText = amigoDinero; }
             if (d.type === 'MOVE') { miTurno = true; document.getElementById('turno-text').innerText = "¡ES TU TURNO!"; log("¡Te toca lanzar!"); }
         });
     }
@@ -112,8 +93,11 @@
     function tirarDado() {
         if(!miTurno) return;
         let val = Math.floor(Math.random()*6)+1;
+        let viejaPos = miPos;
         miPos = (miPos + val) % mapa.length;
-        cobrarRenta(miPos);
+        
+        if (miPos < viejaPos) { miDinero += 100; log("Pasaste por SALIDA: +$100"); }
+        
         log("Caíste en " + mapa[miPos].n);
         conn.send({type: 'MOVE', pos: miPos});
         miTurno = false;
@@ -121,7 +105,6 @@
         log("Le toca a tu amorcito!");
     }
 
-    // Render tablero
     const board = document.getElementById('board');
     mapa.forEach((m, i) => {
         const d = document.createElement('div');
