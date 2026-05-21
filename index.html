@@ -2,20 +2,22 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Cute Monopoly Town P2P</title>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <title>Cute Monopoly Town Firebase</title>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <style>
         body { background: #fff0f3; font-family: 'Montserrat', sans-serif; display: flex; justify-content: center; padding: 20px; color: #c71585; }
         .container { display: flex; gap: 25px; width: 950px; }
         .board { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(5, 100px); gap: 8px; background: #ffccd5; padding: 15px; border-radius: 25px; position: relative; }
-        .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; }
+        .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; cursor: pointer; }
+        .owned-host { background-color: #add8e6 !important; }
+        .owned-visitante { background-color: #ffb6c1 !important; }
         .token { width: 35px; height: 35px; position: absolute; z-index: 10; transition: all 0.5s ease; pointer-events: none; }
         .center-zone { grid-column: 2 / 5; grid-row: 2 / 5; background: #fff5f7; border: 3px dashed #ff80bf; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; }
         .sidebar { width: 320px; display: flex; flex-direction: column; gap: 20px; }
         .panel { background: #fff0f9; padding: 20px; border-radius: 20px; border: 2px solid #ffccd5; }
         .btn { width: 100%; padding: 10px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin: 5px 0; font-size: 12px; }
-        .input-field { width: 93%; padding: 8px; margin: 5px 0; border: 1px solid #ffccd5; border-radius: 8px; }
-        .dice-img { width: 60px; height: 60px; cursor: pointer; margin: 10px; }
         #log { height: 300px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; }
     </style>
 </head>
@@ -25,103 +27,98 @@
     <div class="board" id="board">
         <img src="https://i.imgur.com/FGnMi8Y.png" id="p0" class="token">
         <img src="https://i.imgur.com/fRZJfP8.png" id="p1" class="token">
-        <img src="https://i.imgur.com/u2AtssG.png" id="p2" class="token">
-        <img src="https://i.imgur.com/ekQp8WL.png" id="p3" class="token">
         <div class="center-zone">
             <div id="turno-text" style="font-weight:bold;">ESPERANDO...</div>
-            <img src="https://i.imgur.com/Nsafzb4.png" class="dice-img" onclick="tirarDado()">
+            <button class="btn" onclick="tirarDado()">TIRAR DADO</button>
             <button class="btn" onclick="comprar()">COMPRAR</button>
             <button class="btn" onclick="mejorar()" style="background:#ff80bf;">MEJORAR (+)</button>
+            <div>💖 $<span id="dinero-mio">1000</span></div>
         </div>
     </div>
     <div class="sidebar">
-        <div class="panel">
-            <strong>Conexión</strong>
-            <input type="text" id="peer-id" class="input-field" placeholder="ID amigo">
-            <button class="btn" onclick="conectar()">Conectar</button>
-            <div id="my-id" style="font-size: 11px; margin-top: 5px;">Iniciando...</div>
-        </div>
         <div class="panel"><strong>Historial</strong><div id="log"></div></div>
     </div>
 </div>
 
 <script>
-    const peer = new Peer();
-    let miIdx = 0, hostConn = null, turnoActual = 0;
-    let posiciones = [0, 0, 0, 0];
-    let listaConexiones = []; 
-    const nombres = ["Dog", "Horse", "Hat", "Car"];
+    const firebaseConfig = {
+        apiKey: "AIzaSyBV8Kcd8mF2CGlIRWDxDR6B3f1_50V3FH0",
+        authDomain: "monopolovely.firebaseapp.com",
+        databaseURL: "https://monopolovely-default-rtdb.firebaseio.com",
+        projectId: "monopolovely",
+        storageBucket: "monopolovely.firebasestorage.app",
+        messagingSenderId: "325639499908",
+        appId: "1:325639499908:web:94ad73a6d82da77ce552d1"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
-    function log(m) { const l = document.getElementById('log'); l.innerHTML += `<div>> ${m}</div>`; l.scrollTop = l.scrollHeight; }
-    peer.on('open', id => document.getElementById('my-id').innerText = "ID: " + id);
+    const miIdx = Math.floor(Math.random() * 2); // 0 o 1
+    const nombres = ["Host", "Visitante"];
+    let miDinero = 1000, miPos = 0;
 
-    // EL HOST ACTÚA COMO HUB
-    peer.on('connection', conn => {
-        let nuevoIdx = listaConexiones.length + 1;
-        listaConexiones.push({idx: nuevoIdx, conn: conn});
-        
-        conn.on('data', data => {
-            if(data.type === 'MOVE') {
-                posiciones[data.idx] = data.pos;
-                turnoActual = (data.idx + 1) % 4;
-                
-                // BROADCAST: Enviar el nuevo estado a TODOS los conectados
-                let payload = {type: 'UPDATE', pos: posiciones, turn: turnoActual};
-                listaConexiones.forEach(c => c.conn.send(payload));
-                actualizarJuego(payload); // Actualizar el Host también
-            }
-        });
-        
-        conn.send({type: 'WELCOME', idx: nuevoIdx, pos: posiciones, turn: turnoActual});
-        log(nombres[nuevoIdx] + " se ha unido.");
+    // Inicializar mapa en Firebase si no existe
+    db.ref('game').once('value', snap => {
+        if(!snap.exists()) {
+            db.ref('game').set({ turno: 0, posiciones: [0,0], mapa: [
+                {n: "SALIDA", p:0, up:0, owner:null}, {n: "IGLESIA", p:100, owner:null, up:0}, {n: "?", p:0, owner:null, up:0}, {n: "BOUTIQUE", p:200, owner:null, up:0}, 
+                {n: "¡A LA CÁRCEL!", p:0, owner:null, up:0}, {n: "CHEONGDAM", p:500, owner:null, up:0}, {n: "GANGNAM", p:520, owner:null, up:0}, {n: "SEOCHO-GU", p:250, owner:null, up:0}, 
+                {n: "MAPO", p:300, owner:null, up:0}, {n: "INCHEON", p:350, owner:null, up:0}, {n: "JOYAS", p:400, owner:null, up:0}, {n: "CÁRCEL", p:0, owner:null, up:0}, 
+                {n: "VILLA 3", p:220, owner:null, up:0}, {n: "?", p:0, owner:null, up:0}, {n: "ARCA", p:0, owner:null, up:0}, {n: "BUKCHON", p:500, owner:null, up:0}
+            ]});
+        }
     });
 
-    function conectar() {
-        hostConn = peer.connect(document.getElementById('peer-id').value);
-        hostConn.on('data', data => {
-            if(data.type === 'WELCOME') { miIdx = data.idx; actualizarJuego(data); }
-            if(data.type === 'UPDATE') actualizarJuego(data);
+    // Escuchar cambios
+    db.ref('game').on('value', snap => {
+        const data = snap.val();
+        if(!data) return;
+        
+        document.getElementById('turno-text').innerText = "Turno: " + (data.turno === miIdx ? "TU TURNO" : "Esperando...");
+        
+        // Mover fichas
+        data.posiciones.forEach((pos, i) => {
+            const el = document.getElementById('p'+i);
+            const cell = document.getElementById('cell-' + pos);
+            if(cell && el) { el.style.left = (cell.offsetLeft + 10) + 'px'; el.style.top = (cell.offsetTop + 10) + 'px'; }
+        });
+
+        // Actualizar dueños
+        data.mapa.forEach((m, i) => {
+            const cell = document.getElementById('cell-'+i);
+            if(m.owner) cell.className = 'cell ' + (m.owner === 'host' ? 'owned-host' : 'owned-visitante');
+        });
+    });
+
+    function tirarDado() {
+        db.ref('game').once('value').then(snap => {
+            const data = snap.val();
+            if(data.turno !== miIdx) return;
+            
+            let pos = data.posiciones;
+            pos[miIdx] = (pos[miIdx] + Math.floor(Math.random()*6)+1) % 16;
+            db.ref('game').update({ posiciones: pos, turno: (miIdx === 0 ? 1 : 0) });
         });
     }
 
-    function actualizarJuego(data) {
-        posiciones = data.pos;
-        turnoActual = data.turn;
-        document.getElementById('turno-text').innerText = "Turno: " + nombres[turnoActual];
-        posiciones.forEach((pos, i) => {
-            const el = document.getElementById('p' + i);
-            const cell = document.getElementById('cell-' + pos);
-            if(cell && el) { 
-                el.style.left = (cell.offsetLeft + 10) + 'px'; 
-                el.style.top = (cell.offsetTop + 10) + 'px'; 
+    function comprar() {
+        db.ref('game').once('value').then(snap => {
+            const data = snap.val();
+            let mapa = data.mapa;
+            if(!mapa[data.posiciones[miIdx]].owner) {
+                mapa[data.posiciones[miIdx]].owner = (miIdx === 0 ? 'host' : 'visitante');
+                db.ref('game').update({ mapa: mapa });
             }
         });
     }
 
-    function tirarDado() {
-        if(miIdx !== turnoActual) { log("Espera... turno de: " + nombres[turnoActual]); return; }
-        
-        let nuevaPos = (posiciones[miIdx] + Math.floor(Math.random()*6)+1) % 16;
-        
-        if(miIdx === 0) { // El Host se mueve a sí mismo
-            posiciones[miIdx] = nuevaPos;
-            turnoActual = (miIdx + 1) % 4;
-            let payload = {type: 'UPDATE', pos: posiciones, turn: turnoActual};
-            listaConexiones.forEach(c => c.conn.send(payload));
-            actualizarJuego(payload);
-        } else { // El invitado le pide al Host que procese su movimiento
-            hostConn.send({type: 'MOVE', idx: miIdx, pos: nuevaPos});
-        }
-    }
-
-    // Inicializar Tablero
+    // Render inicial
     const board = document.getElementById('board');
     for(let i=0; i<16; i++) {
         const d = document.createElement('div');
         d.className = 'cell'; d.id = 'cell-' + i; d.innerHTML = "Casilla "+i;
         board.appendChild(d);
     }
-    function comprar() {} function mejorar() {}
 </script>
 </body>
 </html>
