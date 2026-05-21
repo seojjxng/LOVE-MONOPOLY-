@@ -20,7 +20,7 @@
         .btn { width: 100%; padding: 10px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin: 5px 0; font-size: 12px; }
         .input-field { width: 93%; padding: 8px; margin: 5px 0; border: 1px solid #ffccd5; border-radius: 8px; }
         .dice-img { width: 60px; height: 60px; cursor: pointer; margin: 10px; }
-        #log { height: 300px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; }
+        #log { height: 200px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; }
         .chat-box { width: 950px; margin-top: 20px; background: #fff0f9; padding: 20px; border-radius: 20px; border: 2px solid #ffccd5; }
         #chat-messages { height: 100px; overflow-y: auto; background: white; border: 1px solid #ffccd5; border-radius: 10px; padding: 10px; margin-bottom: 10px; font-size: 12px; }
     </style>
@@ -29,10 +29,10 @@
 
 <div class="container">
     <div class="board" id="board">
-        <img src="https://i.imgur.com/FGnMi8Y.png" id="p1" class="token" style="left:50px; top:50px;">
-        <img src="https://i.imgur.com/fRZJfP8.png" id="p2" class="token" style="left:50px; top:50px;">
-        <img src="https://i.imgur.com/u2AtssG.png" id="p3" class="token" style="left:50px; top:50px;">
-        <img src="https://i.imgur.com/ekQp8WL.png" id="p4" class="token" style="left:50px; top:50px;">
+        <img src="https://i.imgur.com/FGnMi8Y.png" id="p1" class="token" style="left:20px; top:20px;">
+        <img src="https://i.imgur.com/fRZJfP8.png" id="p2" class="token" style="left:20px; top:20px;">
+        <img src="https://i.imgur.com/u2AtssG.png" id="p3" class="token" style="left:20px; top:20px;">
+        <img src="https://i.imgur.com/ekQp8WL.png" id="p4" class="token" style="left:20px; top:20px;">
         <div class="center-zone">
             <div id="turno-text" style="font-weight:bold;">ESPERANDO...</div>
             <img src="https://i.imgur.com/Nsafzb4.png" class="dice-img" onclick="tirarDado()">
@@ -41,25 +41,36 @@
             <div>💖 $<span id="dinero-mio">1000</span></div>
         </div>
     </div>
+    
     <div class="sidebar">
         <div class="panel">
             <strong>Conexión</strong>
-            <input type="text" id="peer-id" class="input-field">
+            <input type="text" id="peer-id" class="input-field" placeholder="ID del amigo">
             <button class="btn" onclick="conectar()">Conectar</button>
-            <div id="my-id">Iniciando...</div>
+            <div id="my-id" style="font-size: 11px;">Iniciando...</div>
         </div>
+        <div class="panel"><strong>Historial</strong><div id="log"></div></div>
     </div>
+</div>
+
+<div class="chat-box">
+    <strong>Chat</strong>
+    <div id="chat-messages"></div>
+    <input type="text" id="chat-input" class="input-field" placeholder="Escribe un mensaje...">
+    <button class="btn" onclick="enviarMensaje()">Enviar</button>
 </div>
 
 <script>
     const peer = new Peer();
-    let peerConnections = [];
     let conn;
+    let peerConnections = [];
     let miIndex = 0;
     let turnoActual = 0;
     let miPos = [0,0,0,0];
     let esHost = false;
+    let miDinero = 1000;
     let jugadores = ["Dog", "Caballo", "Hat", "Car"];
+
     const mapa = [
         {n: "SALIDA", p:0}, {n: "IGLESIA", p:100}, {n: "?", p:0}, {n: "BOUTIQUE", p:200}, 
         {n: "¡A LA CÁRCEL!", p:0}, {n: "CHEONGDAM", p:500}, {n: "GANGNAM", p:520}, {n: "SEOCHO-GU", p:250}, 
@@ -67,11 +78,15 @@
         {n: "VILLA 3", p:220}, {n: "?", p:0}, {n: "ARCA", p:0}, {n: "BUKCHON", p:500}
     ];
 
+    // Funciones básicas
+    function log(m) { const l = document.getElementById('log'); l.innerHTML += `<div>> ${m}</div>`; l.scrollTop = l.scrollHeight; }
+    function mostrarChat(user, msg) { document.getElementById('chat-messages').innerHTML += `<div><b>${user}:</b> ${msg}</div>`; }
+    
     function moverFichas(idx, pos) {
         const el = document.getElementById('p' + (idx + 1));
         const cell = document.getElementById('cell-' + pos);
         if(cell && el) {
-            el.style.left = (cell.offsetLeft + 10 + (idx*8)) + 'px';
+            el.style.left = (cell.offsetLeft + 10 + (idx*5)) + 'px';
             el.style.top = (cell.offsetTop + 10) + 'px';
         }
     }
@@ -81,6 +96,7 @@
         let val = Math.floor(Math.random()*6)+1;
         miPos[miIndex] = (miPos[miIndex] + val) % 16;
         moverFichas(miIndex, miPos[miIndex]);
+        log("Moviste a " + miPos[miIndex]);
         
         let data = {type: 'MOVE', idx: miIndex, pos: miPos[miIndex]};
         if (esHost) {
@@ -91,17 +107,36 @@
         }
     }
 
+    function enviarMensaje() {
+        let msg = document.getElementById('chat-input').value;
+        let data = {type: 'CHAT', user: jugadores[miIndex], msg: msg};
+        mostrarChat(jugadores[miIndex], msg);
+        if(esHost) peerConnections.forEach(c => c.send(data));
+        else if(conn) conn.send(data);
+        document.getElementById('chat-input').value = "";
+    }
+
+    // Inicialización del Tablero
+    const board = document.getElementById('board');
+    mapa.forEach((m, i) => {
+        const d = document.createElement('div');
+        d.className = 'cell'; d.id = 'cell-' + i; d.innerHTML = `${m.n}<br>${m.p > 0 ? '$'+m.p : ''}`;
+        board.appendChild(d);
+    });
+
     peer.on('open', id => document.getElementById('my-id').innerText = "ID: " + id);
     peer.on('connection', c => {
         esHost = true;
         peerConnections.push(c);
-        c.send({type: 'INIT', index: peerConnections.length});
         c.on('data', d => {
             if(d.type === 'MOVE') {
                 miPos[d.idx] = d.pos;
                 moverFichas(d.idx, d.pos);
                 peerConnections.forEach(con => con.send(d));
-                turnoActual = (d.idx + 1) % 4;
+            }
+            if(d.type === 'CHAT') {
+                mostrarChat(d.user, d.msg);
+                peerConnections.forEach(con => con.send(d));
             }
         });
     });
@@ -109,17 +144,13 @@
     function conectar() {
         conn = peer.connect(document.getElementById('peer-id').value);
         conn.on('data', d => {
-            if(d.type === 'INIT') miIndex = d.index;
             if(d.type === 'MOVE') { miPos[d.idx] = d.pos; moverFichas(d.idx, d.pos); }
+            if(d.type === 'CHAT') mostrarChat(d.user, d.msg);
         });
     }
 
-    const board = document.getElementById('board');
-    mapa.forEach((m, i) => {
-        const d = document.createElement('div');
-        d.className = 'cell'; d.id = 'cell-' + i; d.innerHTML = `${m.n}<br>$${m.p}`;
-        board.appendChild(d);
-    });
+    function comprar() { log("Intentando comprar..."); }
+    function mejorar() { log("Intentando mejorar..."); }
 </script>
 </body>
 </html>
