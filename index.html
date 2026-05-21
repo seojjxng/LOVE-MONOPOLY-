@@ -57,7 +57,6 @@
     const peer = new Peer();
     let conn, miTurno = false, miPos = 0, amigoPos = 0, miDinero = 1000, bloqueado = false;
     
-    // Mantenemos tu mapa, agregando 'renta' a las propiedades
     const mapa = [
         {n: "SALIDA", p:0}, {n: "TÉ ($100)", p:100, owner:null, renta: 20}, 
         {n: "SUERTE", p:0}, {n: "BOUTIQUE ($200)", p:200, owner:null, renta: 40}, 
@@ -72,7 +71,7 @@
     function log(m) { const l = document.getElementById('log'); l.innerHTML += `<div>> ${m}</div>`; l.scrollTop = l.scrollHeight; }
 
     function moverFichas() {
-        ['p1', 'p2'].forEach((id, idx) => {
+        ['p1', 'p2'].forEach((id) => {
             let pos = (id === 'p1') ? miPos : amigoPos;
             const cell = document.getElementById('cell-' + pos);
             const rect = cell.getBoundingClientRect();
@@ -93,7 +92,7 @@
         let casilla = mapa[miPos];
         log("Caíste en " + casilla.n);
         
-        // Lógica de Renta y Casillas
+        let proximoBloqueado = false;
         if (casilla.owner && casilla.owner !== 'yo') {
             miDinero -= casilla.renta;
             log("Pagaste $" + casilla.renta + " de alquiler.");
@@ -106,15 +105,17 @@
             miDinero -= 50;
             log("Servicio Comunitario: -$50");
         } else if (casilla.n.includes("POLICÍA")) {
-            bloqueado = true;
-            log("¡DETENIDO!");
+            proximoBloqueado = true;
+            log("¡DETENIDO! Pierdes turno.");
         }
         
         document.getElementById('dinero-mio').innerText = miDinero;
         moverFichas();
-        if(conn) conn.send({type: 'MOVE', pos: miPos, money: miDinero});
+        
+        // Enviamos el estado de si quedamos bloqueados para que el otro sepa que juega de nuevo
         miTurno = false;
         document.getElementById('turno-text').innerText = "ESPERANDO...";
+        if(conn) conn.send({type: 'MOVE', pos: miPos, money: miDinero, lock: proximoBloqueado});
     }
 
     function comprar() {
@@ -131,13 +132,18 @@
 
     function setupConn() {
         conn.on('data', d => {
-            if(d.type === 'MOVE') { amigoPos = d.pos; moverFichas(); miTurno = true; document.getElementById('turno-text').innerText = "¡TU TURNO!"; }
+            if(d.type === 'MOVE') { 
+                amigoPos = d.pos; 
+                moverFichas(); 
+                // Si el otro jugador quedó bloqueado (d.lock es true), yo mantengo miTurno en true
+                miTurno = d.lock ? true : true; 
+                document.getElementById('turno-text').innerText = "¡TU TURNO!"; 
+            }
             if(d.type === 'BUY') { mapa[d.pos].owner = 'amigo'; document.getElementById('cell-' + d.pos).classList.add('owned'); }
             if(d.type === 'RENT') { miDinero += d.amount; document.getElementById('dinero-mio').innerText = miDinero; }
         });
     }
 
-    // Inicialización visual
     const board = document.getElementById('board');
     mapa.forEach((m, i) => {
         const d = document.createElement('div');
