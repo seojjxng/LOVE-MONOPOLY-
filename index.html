@@ -2,47 +2,66 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Cute Monopoly Adventure</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cute Monopoly Adventure - P2P</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { background: #fff0f3; font-family: sans-serif; display: flex; justify-content: center; padding: 20px; }
-        .arcade-container { width: 100%; max-width: 600px; background: white; padding: 20px; border-radius: 20px; border: 4px solid #ffb3d9; }
-        .board-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 20px; }
-        .b-cell { background: #fffafb; border: 2px solid #ffccd5; padding: 10px; text-align: center; }
-        .id-display { background: #ffe6f2; padding: 10px; font-weight: bold; color: #ff0084; }
+        *, *::before, *::after { box-sizing: border-box; }
+        body { margin: 0; padding: 15px; background: #fff0f3; font-family: 'Montserrat', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background-image: radial-gradient(#ffccd5 2px, transparent 0); background-size: 24px 24px; user-select: none; }
+        .arcade-container { position: relative; width: 100%; max-width: 1020px; display: flex; flex-direction: column; align-items: center; }
+        .cute-ears { width: 100%; display: flex; justify-content: space-between; padding: 0 45px; margin-bottom: -15px; z-index: 1; }
+        .ear { width: 45px; height: 35px; background: #ffb3d9; border: 6px solid #ff80bf; border-bottom: none; border-radius: 25px 25px 0 0; position: relative; box-shadow: inset 0 8px 0 #fff; }
+        .arcade-window { width: 100%; background: #fff; border: 8px solid #ffb3d9; border-radius: 40px; box-shadow: 0 12px 0px #ff80bf, 0 14px 20px rgba(255, 128, 191, 0.3); overflow: hidden; display: flex; flex-direction: column; z-index: 2; }
+        .arcade-bar { height: 36px; background: #ff80bf; display: flex; align-items: center; padding: 0 18px; justify-content: space-between; color: white; font-size: 11px; font-weight: 900; letter-spacing: 1px; border-bottom: 3px solid #ff59aa; }
+        .main-layout { display: flex; flex-direction: row; padding: 20px; background: #fff0f3; gap: 20px; width: 100%; }
+        .board-wrapper { flex: 1; background: #ffffff; border: 8px solid #ffb3d9; border-radius: 24px; padding: 15px; box-shadow: 0 6px 0 #ffe6f2; display: flex; justify-content: center; align-items: center; position: relative; }
+        .board-grid { display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(5, 1fr); gap: 5px; width: 100%; aspect-ratio: 1 / 1; background: #fff5f7; border-radius: 16px; position: relative; }
+        .b-cell { background: white; border: 2px solid #ffccd5; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; font-size: 9px; font-weight: 900; color: #ff59aa; text-align: center; padding: 6px 4px; position: relative; box-shadow: inset 0 -3px 0 #fff0f3; }
+        .b-cell.center-zone { grid-column: 2 / 5; grid-row: 2 / 5; background: #fff5f7; border: 3px dashed #ff80bf; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 10px; }
+        .dice { width: 55px; height: 55px; background: white; border: 4px solid #ff80bf; border-radius: 14px; box-shadow: 0 4px 0 #ff80bf; display: flex; align-items: center; justify-content: center; font-size: 26px; cursor: pointer; }
+        .sidebar-area { width: 280px; display: flex; flex-direction: column; gap: 12px; }
+        .side-box { position: relative; background: #ffffff; border: 3px solid #ffb3d9; border-radius: 20px; padding: 15px; box-shadow: 0 4px 0 #ffe6f2; }
+        .box-tag { position: absolute; top: -9px; left: 15px; background: #ff80bf; color: #fff; font-size: 8px; font-weight: 900; padding: 2px 8px; border-radius: 8px; border: 1.5px solid #fff; text-transform: uppercase; }
+        .action-btn { display: block; width: 100%; padding: 10px; font-size: 11px; font-weight: 900; color: white; border: none; border-radius: 12px; cursor: pointer; background: #ff59aa; box-shadow: 0 4px 0 #b83275; margin-top: 5px; }
+        .net-input { width: 100%; padding: 8px; font-size: 11px; border: 2px solid #ffccd5; border-radius: 8px; margin-bottom: 8px; font-family: monospace; text-align: center; }
+        .id-display { background: #ffe6f2; color: #ff0084; padding: 6px; border-radius: 8px; font-size: 10px; font-family: monospace; text-align: center; margin-bottom: 8px; border: 1px solid #ffccd5; }
     </style>
 </head>
 <body>
 
 <div class="arcade-container">
-    <h3>CUTE MONOPOLY P2P</h3>
-    
-    <!-- Sección Host -->
-    <div id="host-zone">
-        <p>Tu ID de Host:</p>
-        <div class="id-display" id="my-peer-id">Esperando...</div>
+    <div class="cute-ears"><div class="ear"></div><div class="ear"></div></div>
+    <div class="arcade-window">
+        <div class="arcade-bar"><span>CUTE MONOPOLY TOWN P2P</span><div>MULTI-JUGADOR GITHUB</div></div>
+        <div class="main-layout">
+            <div class="board-wrapper"><div class="board-grid" id="board-mesh"></div></div>
+            <div class="sidebar-area">
+                <div class="side-box">
+                    <span class="box-tag">Conexión P2P</span>
+                    <div id="host-section">
+                        <div style="font-size: 9px; font-weight:900; color:#ff0084;">Tu ID:</div>
+                        <div class="id-display" id="my-peer-id">Generando...</div>
+                    </div>
+                    <div id="guest-section">
+                        <input type="text" class="net-input" id="rival-peer-id" placeholder="ID de tu amigo">
+                        <button class="action-btn" style="background:#208696;" onclick="conectar()">💎 Conectar</button>
+                    </div>
+                </div>
+                <div class="side-box"><span class="box-tag">Estado</span><div id="event-log" style="font-size: 10px; color: #8a7c8c; height: 50px;">Esperando red...</div></div>
+            </div>
+        </div>
     </div>
-
-    <!-- Sección Invitado -->
-    <div style="margin-top:20px;">
-        <input type="text" id="rival-peer-id" placeholder="ID del Host aquí">
-        <button onclick="conectar()">💎 Conectar como Invitado</button>
-    </div>
-
-    <div id="event-log" style="margin-top:10px; font-weight:bold;">Estado: Iniciando...</div>
-    <div class="board-grid" id="board-mesh"></div>
 </div>
 
 <script>
-    // LÓGICA: Solo asignamos ID fijo si es el primer jugador.
-    // Para simplificar, dejaremos que PeerJS asigne IDs aleatorios a ambos.
-    // Es la forma más segura de que no se rompa el código.
-    const peer = new Peer(); 
+    // Configuración estable
+    const peer = new Peer(undefined, { host: '0.peerjs.com', port: 443, secure: true });
     let conn;
 
     peer.on('open', (id) => {
         document.getElementById('my-peer-id').innerText = id;
-        document.getElementById('event-log').innerText = "✅ Listo. Comparte este ID.";
+        document.getElementById('event-log').innerText = "✅ Listo para jugar";
         buildBoard();
     });
 
@@ -60,17 +79,22 @@
 
     function setupConnection() {
         conn.on('open', () => {
-            document.getElementById('event-log').innerText = "💎 ¡CONEXIÓN ESTABLECIDA!";
+            document.getElementById('event-log').innerText = "💎 ¡Conexión establecida!";
         });
         conn.on('data', (data) => { alert("Recibido: " + data); });
     }
 
     function buildBoard() {
         const boardMesh = document.getElementById('board-mesh');
+        boardMesh.innerHTML = '';
+        const center = document.createElement('div');
+        center.className = 'b-cell center-zone';
+        center.innerHTML = `<div class="dice">🎲</div>`;
+        boardMesh.appendChild(center);
         for(let i=0; i<16; i++) {
             const div = document.createElement('div');
             div.className = 'b-cell';
-            div.innerText = `Villa ${i + 1}`;
+            div.innerText = `VILLA ${i + 1}`;
             boardMesh.appendChild(div);
         }
     }
