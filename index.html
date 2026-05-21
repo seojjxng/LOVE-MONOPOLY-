@@ -8,7 +8,7 @@
         body { background: #fff0f3; font-family: 'Montserrat', sans-serif; display: flex; justify-content: center; padding: 20px; color: #c71585; }
         .container { display: flex; gap: 25px; width: 950px; }
         .board { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(5, 100px); gap: 8px; background: #ffccd5; padding: 15px; border-radius: 25px; position: relative; }
-        .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; cursor: pointer; }
+        .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; }
         .token { width: 35px; height: 35px; position: absolute; z-index: 10; transition: all 0.5s ease; pointer-events: none; }
         .center-zone { grid-column: 2 / 5; grid-row: 2 / 5; background: #fff5f7; border: 3px dashed #ff80bf; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; }
         .sidebar { width: 320px; display: flex; flex-direction: column; gap: 20px; }
@@ -32,7 +32,6 @@
             <img src="https://i.imgur.com/Nsafzb4.png" class="dice-img" onclick="tirarDado()">
             <button class="btn" onclick="comprar()">COMPRAR</button>
             <button class="btn" onclick="mejorar()" style="background:#ff80bf;">MEJORAR (+)</button>
-            <div>💖 $<span id="dinero-mio">1000</span></div>
         </div>
     </div>
     <div class="sidebar">
@@ -50,41 +49,37 @@
     const peer = new Peer();
     let miIdx = 0, hostConn = null, turnoActual = 0;
     let posiciones = [0, 0, 0, 0];
-    let conexiones = []; // El host guarda a todos aquí
+    let listaConexiones = []; 
     const nombres = ["Dog", "Horse", "Hat", "Car"];
 
     function log(m) { const l = document.getElementById('log'); l.innerHTML += `<div>> ${m}</div>`; l.scrollTop = l.scrollHeight; }
-
     peer.on('open', id => document.getElementById('my-id').innerText = "ID: " + id);
 
-    // ESCUCHA DEL HOST
+    // EL HOST ACTÚA COMO HUB
     peer.on('connection', conn => {
-        let nuevoIdx = conexiones.length + 1;
-        conexiones.push({idx: nuevoIdx, conn: conn});
+        let nuevoIdx = listaConexiones.length + 1;
+        listaConexiones.push({idx: nuevoIdx, conn: conn});
         
         conn.on('data', data => {
-            // El Host recibe movimiento y lo reenvía a TODOS (incluido el emisor para confirmar)
             if(data.type === 'MOVE') {
                 posiciones[data.idx] = data.pos;
                 turnoActual = (data.idx + 1) % 4;
-                let payload = {type: 'UPDATE', pos: posiciones, turn: turnoActual};
                 
-                // Retransmitir a TODOS los conectados
-                conexiones.forEach(c => c.conn.send(payload));
-                // Actualizar localmente al Host
-                actualizarJuego(payload);
+                // BROADCAST: Enviar el nuevo estado a TODOS los conectados
+                let payload = {type: 'UPDATE', pos: posiciones, turn: turnoActual};
+                listaConexiones.forEach(c => c.conn.send(payload));
+                actualizarJuego(payload); // Actualizar el Host también
             }
         });
         
-        conn.send({type: 'WELCOME', idx: nuevoIdx, pos: posiciones});
+        conn.send({type: 'WELCOME', idx: nuevoIdx, pos: posiciones, turn: turnoActual});
         log(nombres[nuevoIdx] + " se ha unido.");
     });
 
-    // ESCUCHA DEL INVITADO
     function conectar() {
         hostConn = peer.connect(document.getElementById('peer-id').value);
         hostConn.on('data', data => {
-            if(data.type === 'WELCOME') { miIdx = data.idx; posiciones = data.pos; actualizarJuego({pos: posiciones, turn: 0}); }
+            if(data.type === 'WELCOME') { miIdx = data.idx; actualizarJuego(data); }
             if(data.type === 'UPDATE') actualizarJuego(data);
         });
     }
@@ -96,7 +91,10 @@
         posiciones.forEach((pos, i) => {
             const el = document.getElementById('p' + i);
             const cell = document.getElementById('cell-' + pos);
-            if(cell && el) { el.style.left = (cell.offsetLeft + 10) + 'px'; el.style.top = (cell.offsetTop + 10) + 'px'; }
+            if(cell && el) { 
+                el.style.left = (cell.offsetLeft + 10) + 'px'; 
+                el.style.top = (cell.offsetTop + 10) + 'px'; 
+            }
         });
     }
 
@@ -104,19 +102,19 @@
         if(miIdx !== turnoActual) { log("Espera... turno de: " + nombres[turnoActual]); return; }
         
         let nuevaPos = (posiciones[miIdx] + Math.floor(Math.random()*6)+1) % 16;
-        let d = {type: 'MOVE', idx: miIdx, pos: nuevaPos};
         
-        if(miIdx === 0) { // Si soy el Host, proceso yo mismo
+        if(miIdx === 0) { // El Host se mueve a sí mismo
             posiciones[miIdx] = nuevaPos;
             turnoActual = (miIdx + 1) % 4;
             let payload = {type: 'UPDATE', pos: posiciones, turn: turnoActual};
-            conexiones.forEach(c => c.conn.send(payload));
+            listaConexiones.forEach(c => c.conn.send(payload));
             actualizarJuego(payload);
-        } else { // Si soy invitado, envío al Host
-            hostConn.send(d);
+        } else { // El invitado le pide al Host que procese su movimiento
+            hostConn.send({type: 'MOVE', idx: miIdx, pos: nuevaPos});
         }
     }
 
+    // Inicializar Tablero
     const board = document.getElementById('board');
     for(let i=0; i<16; i++) {
         const d = document.createElement('div');
