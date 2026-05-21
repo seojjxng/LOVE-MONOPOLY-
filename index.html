@@ -80,15 +80,15 @@
         let val = Math.floor(Math.random()*6)+1;
         miPos[miIndex] = (miPos[miIndex] + val) % 16;
         if (miPos[miIndex] === 4) miPos[miIndex] = 11;
-        let data = {type: 'MOVE', idx: miIndex, pos: miPos[miIndex], next: (miIndex + 1) % 4};
+        let data = {type: 'MOVE', idx: miIndex, pos: miPos[miIndex], next: (miIndex + 1) % 4, miPos: miPos, turnoActual: (miIndex + 1) % 4};
         procesarMovimiento(data);
         if (esHost) peerConnections.forEach(c => c.send(data));
         else conn.send(data);
     }
 
     function procesarMovimiento(d) {
-        miPos[d.idx] = d.pos;
-        turnoActual = d.next;
+        miPos = d.miPos;
+        turnoActual = d.turnoActual;
         const el = document.getElementById('p' + (d.idx + 1));
         const cell = document.getElementById('cell-' + d.pos);
         if(cell && el) { el.style.left = (cell.offsetLeft + 10) + 'px'; el.style.top = (cell.offsetTop + 10) + 'px'; }
@@ -98,22 +98,22 @@
 
     peer.on('open', id => {
         document.getElementById('my-id').innerText = "ID: " + id;
-        if (id) log("Dog (el host) creó la sala.");
+        if (id) log("Bienvenido, " + jugadores[0]);
     });
 
     peer.on('connection', c => {
         esHost = true;
         peerConnections.push(c);
         let nuevoIdx = peerConnections.length;
-        let nombreInvitado = jugadores[nuevoIdx];
-        
-        c.send({type: 'INIT', idx: nuevoIdx});
-        log(nombreInvitado + " se ha unido a la sala exitosamente.");
+        c.send({type: 'INIT', idx: nuevoIdx, miPos: miPos, turnoActual: turnoActual});
+        log(jugadores[nuevoIdx] + " se ha unido.");
         
         c.on('data', d => {
-            if (d.type === 'MOVE' || d.type === 'CHAT') {
-                if (d.type === 'MOVE') procesarMovimiento(d);
-                else mostrarChat(d.user, d.msg);
+            if (d.type === 'MOVE') {
+                procesarMovimiento(d);
+                peerConnections.forEach(con => con.send(d));
+            } else if (d.type === 'CHAT') {
+                mostrarChat(d.user, d.msg);
                 peerConnections.forEach(con => con.send(d));
             }
         });
@@ -122,11 +122,9 @@
     function conectar() {
         esHost = false; 
         conn = peer.connect(document.getElementById('peer-id').value);
-        conn.on('open', () => log("Te has unido a la sala exitosamente."));
+        conn.on('open', () => log("Te has unido a la sala."));
         conn.on('data', d => {
-            if (d.type === 'INIT') {
-                miIndex = d.idx;
-            }
+            if (d.type === 'INIT') { miIndex = d.idx; miPos = d.miPos; turnoActual = d.turnoActual; actualizarUI(); }
             if (d.type === 'MOVE') procesarMovimiento(d);
             if (d.type === 'CHAT') mostrarChat(d.user, d.msg);
         });
