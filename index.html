@@ -66,7 +66,8 @@
         sala = document.getElementById('sala-id').value;
         db.ref('salas/' + sala + '/jugadores').once('value', snap => {
             miIdx = snap.numChildren();
-            db.ref('salas/' + sala + '/jugadores/' + miIdx).set({ pos: 0, dinero: 1000 });
+            if(miIdx > 3) return;
+            db.ref('salas/' + sala + '/jugadores/' + miIdx).set({ pos: 0, dinero: 1000, activo: true });
             if(miIdx == 0) db.ref('salas/' + sala + '/turno').set(0);
             document.getElementById('p' + miIdx).style.display = 'block';
             log(nombres[miIdx] + " entró a la sala.");
@@ -81,10 +82,8 @@
             let j = snap.val().jugadores[miIdx];
             let val = Math.floor(Math.random()*6)+1;
             let pos = (j.pos + val) % mapa.length;
-            
             if(pos === 4) { pos = 11; log("¡" + nombres[miIdx] + " fue a la cárcel!"); }
             if(pos < j.pos) j.dinero += 100;
-            
             db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: pos, dinero: j.dinero });
             verificarCasilla(pos, j.dinero);
             db.ref('salas/' + sala + '/turno').set((snap.val().turno + 1) % snap.val().jugadores.length);
@@ -123,17 +122,21 @@
     function sincronizar() {
         db.ref('salas/' + sala).on('value', snap => {
             let s = snap.val();
-            if(!s) return;
+            if(!s || !s.jugadores) return;
             document.getElementById('dinero-mio').innerText = s.jugadores[miIdx].dinero;
-            document.getElementById('turno-text').innerText = (s.turno == miIdx) ? "¡ES TU TURNO!" : "Esperando a " + nombres[s.turno];
+            document.getElementById('turno-text').innerText = (s.turno == miIdx) ? "¡ES TU TURNO!" : "Esperando a " + (nombres[s.turno] || "Jugador");
+            
             s.jugadores.forEach((j, i) => {
                 let el = document.getElementById('p' + i);
-                let cell = document.getElementById('cell-' + j.pos);
-                if(cell && el) { el.style.left = (cell.offsetLeft + 30) + 'px'; el.style.top = (cell.offsetTop + 30) + 'px'; }
+                if(el && j.pos !== undefined) {
+                    let cell = document.getElementById('cell-' + j.pos);
+                    if(cell) { el.style.left = (cell.offsetLeft + 30) + 'px'; el.style.top = (cell.offsetTop + 30) + 'px'; }
+                }
             });
             if(s.propiedades) {
                 Object.keys(s.propiedades).forEach(p => {
-                    document.getElementById('cell-'+p).style.backgroundColor = colores[s.propiedades[p].owner];
+                    let cell = document.getElementById('cell-'+p);
+                    if(cell) cell.style.backgroundColor = colores[s.propiedades[p].owner];
                 });
             }
         });
