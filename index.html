@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cute Monopoly Adventure - P2P</title>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&display=swap" rel="stylesheet">
-    <!-- Usamos PeerJS para conexión directa P2P compatible con Neocities -->
+    <!-- PeerJS para conexión directa P2P -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         *, *::before, *::after { box-sizing: border-box; }
@@ -28,19 +28,13 @@
         .net-input { width: 100%; padding: 8px; font-size: 11px; border: 2px solid #ffccd5; border-radius: 8px; margin-bottom: 8px; font-family: monospace; text-align: center; }
         .id-display { background: #ffe6f2; color: #ff0084; padding: 6px; border-radius: 8px; font-size: 10px; font-family: monospace; text-align: center; margin-bottom: 8px; border: 1px solid #ffccd5; }
     </style>
-    
-    <!-- Agrega esta línea meta para intentar relajar la seguridad -->
-    <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval'; connect-src * 'unsafe-inline' blob: data:;">
-    
-    <meta charset="UTF-8">
-    
 </head>
 <body>
 
 <div class="arcade-container">
     <div class="cute-ears"><div class="ear"></div><div class="ear"></div></div>
     <div class="arcade-window">
-        <div class="arcade-bar"><span>CUTE MONOPOLY TOWN P2P</span><div>MINI-BOARD MULTIJUGADOR</div></div>
+        <div class="arcade-bar"><span>CUTE MONOPOLY TOWN P2P</span><div>MULTI-JUGADOR GITHUB</div></div>
         <div class="main-layout">
             <div class="board-wrapper"><div class="board-grid" id="board-mesh"></div></div>
             <div class="sidebar-area">
@@ -48,7 +42,7 @@
                     <span class="box-tag">Conexión P2P</span>
                     <div id="host-section">
                         <div style="font-size: 9px; font-weight:900; color:#ff0084;">1. Tu ID (Pásalo a tu amigo):</div>
-                        <div class="id-display" id="my-peer-id">Conectando...</div>
+                        <div class="id-display" id="my-peer-id">Cargando ID...</div>
                     </div>
                     <div id="guest-section">
                         <input type="text" class="net-input" id="rival-peer-id" placeholder="ID de tu amigo aquí">
@@ -62,15 +56,14 @@
 </div>
 
 <script>
-    // Inicializar PeerJS
     const peer = new Peer(); 
     let conn;
 
     peer.on('open', (id) => {
         document.getElementById('my-peer-id').innerText = id;
+        document.getElementById('event-log').innerText = "✅ Listo para jugar";
     });
 
-    // Escuchar conexiones entrantes
     peer.on('connection', (c) => {
         conn = c;
         setupConnection();
@@ -78,16 +71,17 @@
 
     function conectarConAmigo() {
         const peerID = document.getElementById('rival-peer-id').value;
+        if (!peerID) return;
         conn = peer.connect(peerID);
         setupConnection();
     }
 
     function setupConnection() {
         conn.on('open', () => {
-            document.getElementById('event-log').innerText = "¡Conexión establecida con éxito!";
+            document.getElementById('event-log').innerText = "💎 ¡Conexión establecida!";
         });
         conn.on('data', (data) => {
-            alert("Recibiste un movimiento: " + data);
+            alert("Recibiste: " + data);
         });
     }
 
