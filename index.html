@@ -55,12 +55,12 @@
 
 <script>
     const peer = new Peer();
-    let conn, miTurno = false, miPos = 0, amigoPos = 0, miDinero = 1000, bloqueado = false, soyHost = false;
+    let conn, miTurno = false, miPos = 0, amigoPos = 0, miDinero = 1000, bloqueado = false, soyHost = false, enviadaACarcel = false;
     
     const mapa = [
         {n: "SALIDA", p:0}, {n: "TÉ ($100)", p:100, owner:null, renta: 20}, 
         {n: "SUERTE", p:0}, {n: "BOUTIQUE ($200)", p:200, owner:null, renta: 40}, 
-        {n: "POLICÍA", p:0}, {n: "CAFÉ ($150)", p:150, owner:null, renta: 30}, 
+        {n: "¡A LA CÁRCEL!", p:0}, {n: "CAFÉ ($150)", p:150, owner:null, renta: 30}, 
         {n: "PARQUE ($120)", p:120, owner:null, renta: 25}, {n: "SPA ($250)", p:250, owner:null, renta: 50}, 
         {n: "VILLA 1 ($300)", p:300, owner:null, renta: 60}, {n: "MALL ($350)", p:350, owner:null, renta: 70}, 
         {n: "JOYAS ($400)", p:400, owner:null, renta: 80}, {n: "POLICÍA", p:0}, 
@@ -95,9 +95,14 @@
         if (casilla.owner && casilla.owner !== 'yo') {
             miDinero -= casilla.renta;
             if(conn) conn.send({type: 'RENT', amount: casilla.renta});
-        } else if (casilla.n.includes("POLICÍA")) {
+        } else if (casilla.n === "¡A LA CÁRCEL!") {
+            miPos = 11; // Redirige a la casilla de policía abajo
+            enviadaACarcel = true;
             proximoBloqueado = true;
-            log("¡DETENIDO! Pierdes turno.");
+            log("¡A LA CÁRCEL! Turno perdido.");
+        } else if (casilla.n === "POLICÍA" && enviadaACarcel) {
+            proximoBloqueado = true;
+            log("En la cárcel: turno perdido.");
         }
         
         document.getElementById('dinero-mio').innerText = miDinero;
@@ -105,8 +110,7 @@
         
         miTurno = false;
         document.getElementById('turno-text').innerText = "ESPERANDO...";
-        // Enviamos 'lock' para que el otro jugador sepa si debe jugar extra
-        if(conn) conn.send({type: 'MOVE', pos: miPos, lock: proximoBloqueado});
+        if(conn) conn.send({type: 'MOVE', pos: miPos, lock: proximoBloqueado, carcel: enviadaACarcel});
     }
 
     function comprar() {
@@ -124,14 +128,105 @@
         conn.on('data', d => {
             if(d.type === 'MOVE') {
                 amigoPos = d.pos;
+                enviadaACarcel = d.carcel;
                 moverFichas();
-                // LÓGICA: Si él se bloqueó, yo recupero mi turno (turno extra). 
-                // Si ambos estamos bloqueados (bloqueado es true), el turno vuelve al anterior.
-                if(d.lock && bloqueado) {
-                    miTurno = soyHost; // El host recupera el turno si ambos están en policía
-                } else {
-                    miTurno = true;
-                }
+                if(d.lock && bloqueado) { miTurno = soyHost; } else { miTurno = true; }
+                document.getElementById('turno-text').innerText = "¡TU TURNO!";
+            }
+            if(d.type === 'BUY') { mapa[d.pos].owner = 'amigo'; document.getElementById('cell-' + d.pos).classList.add('owned'); }
+            if(d.type === 'RENT') { miDinero += d.amount; document.getElementById('dinero-mio').innerText = miDinero; }
+        });
+    }
+
+    const board = document.getElementById('board');
+    mapa.forEach((m, i) => {
+        const d = document.createElement('div');
+        d.className = 'cell'; d.id = 'cell-' + i; d.innerText = m.n;
+        board.appendChild(d);
+    });
+
+    peer.on('open', id => document.getElementById('my-id').innerText = "ID: " + id);
+    peer.on('connection', c => { conn = c; setupConn(); miTurno = false; soyHost = true; document.getElementById('turno-text').innerText = "ESPERANDO..."; });
+    function conectar() { conn = peer.connect(document.getElementById('peer-id').value); setupConn(); miTurno = true; soyHost = false; document.getElementById('turno-text').innerText = "¡TU TURNO!"; }
+    setTimeout(moverFichas, 500);
+</script><script>
+    const peer = new Peer();
+    let conn, miTurno = false, miPos = 0, amigoPos = 0, miDinero = 1000, bloqueado = false, soyHost = false, enviadaACarcel = false;
+    
+    const mapa = [
+        {n: "SALIDA", p:0}, {n: "TÉ ($100)", p:100, owner:null, renta: 20}, 
+        {n: "SUERTE", p:0}, {n: "BOUTIQUE ($200)", p:200, owner:null, renta: 40}, 
+        {n: "¡A LA CÁRCEL!", p:0}, {n: "CAFÉ ($150)", p:150, owner:null, renta: 30}, 
+        {n: "PARQUE ($120)", p:120, owner:null, renta: 25}, {n: "SPA ($250)", p:250, owner:null, renta: 50}, 
+        {n: "VILLA 1 ($300)", p:300, owner:null, renta: 60}, {n: "MALL ($350)", p:350, owner:null, renta: 70}, 
+        {n: "JOYAS ($400)", p:400, owner:null, renta: 80}, {n: "POLICÍA", p:0}, 
+        {n: "VILLA 3 ($220)", p:220, owner:null, renta: 45}, {n: "GYM ($180)", p:180, owner:null, renta: 35}, 
+        {n: "COMUNIDAD", p:0}, {n: "VIVIENDA ($500)", p:500, owner:null, renta: 100}
+    ];
+
+    function log(m) { const l = document.getElementById('log'); l.innerHTML += `<div>> ${m}</div>`; l.scrollTop = l.scrollHeight; }
+
+    function moverFichas() {
+        ['p1', 'p2'].forEach((id) => {
+            let pos = (id === 'p1') ? miPos : amigoPos;
+            const cell = document.getElementById('cell-' + pos);
+            const rect = cell.getBoundingClientRect();
+            const el = document.getElementById(id);
+            el.style.left = (rect.left + (id === 'p1' ? 5 : 40)) + 'px';
+            el.style.top = (rect.top + 5) + 'px';
+        });
+    }
+
+    function tirarDado() {
+        if(!miTurno || bloqueado) return;
+        let val = Math.floor(Math.random()*6)+1;
+        document.getElementById('dice-val').innerText = "Dado: " + val;
+        let prevPos = miPos;
+        miPos = (miPos + val) % mapa.length;
+        if(miPos < prevPos) { miDinero += 100; log("Pasaste por SALIDA: +$100"); }
+        
+        let casilla = mapa[miPos];
+        let proximoBloqueado = false;
+        
+        if (casilla.owner && casilla.owner !== 'yo') {
+            miDinero -= casilla.renta;
+            if(conn) conn.send({type: 'RENT', amount: casilla.renta});
+        } else if (casilla.n === "¡A LA CÁRCEL!") {
+            miPos = 11; // Redirige a la casilla de policía abajo
+            enviadaACarcel = true;
+            proximoBloqueado = true;
+            log("¡A LA CÁRCEL! Turno perdido.");
+        } else if (casilla.n === "POLICÍA" && enviadaACarcel) {
+            proximoBloqueado = true;
+            log("En la cárcel: turno perdido.");
+        }
+        
+        document.getElementById('dinero-mio').innerText = miDinero;
+        moverFichas();
+        
+        miTurno = false;
+        document.getElementById('turno-text').innerText = "ESPERANDO...";
+        if(conn) conn.send({type: 'MOVE', pos: miPos, lock: proximoBloqueado, carcel: enviadaACarcel});
+    }
+
+    function comprar() {
+        let actual = mapa[miPos];
+        if (actual.p > 0 && actual.owner === null && miDinero >= actual.p) {
+            miDinero -= actual.p;
+            actual.owner = 'yo';
+            document.getElementById('cell-' + miPos).classList.add('owned');
+            document.getElementById('dinero-mio').innerText = miDinero;
+            if(conn) conn.send({type: 'BUY', pos: miPos});
+        }
+    }
+
+    function setupConn() {
+        conn.on('data', d => {
+            if(d.type === 'MOVE') {
+                amigoPos = d.pos;
+                enviadaACarcel = d.carcel;
+                moverFichas();
+                if(d.lock && bloqueado) { miTurno = soyHost; } else { miTurno = true; }
                 document.getElementById('turno-text').innerText = "¡TU TURNO!";
             }
             if(d.type === 'BUY') { mapa[d.pos].owner = 'amigo'; document.getElementById('cell-' + d.pos).classList.add('owned'); }
