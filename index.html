@@ -2,23 +2,19 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Cute Monopoly Board</title>
+    <title>Cute Monopoly P2P</title>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         body { background: #fff0f3; font-family: 'Montserrat', sans-serif; display: flex; justify-content: center; padding: 20px; }
-        .game-wrapper { display: flex; gap: 20px; max-width: 1000px; }
-        
-        /* Tablero tipo Monopoly */
-        .board { display: grid; grid-template-columns: repeat(6, 120px); grid-template-rows: repeat(6, 120px); gap: 2px; background: #ffccd5; padding: 5px; border: 4px solid #ff80bf; }
-        .cell { background: white; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; text-align: center; border: 1px solid #ffe6f2; }
-        .center-ui { grid-column: 2 / 6; grid-row: 2 / 6; background: #fff5f7; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 15px; }
-
-        /* Panel derecho */
+        .game-wrapper { display: flex; gap: 20px; }
+        .board { display: grid; grid-template-columns: repeat(6, 110px); grid-template-rows: repeat(6, 110px); gap: 2px; background: #ffccd5; padding: 5px; border: 4px solid #ff80bf; }
+        .cell { background: white; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 9px; text-align: center; border: 1px solid #ffe6f2; cursor: pointer; }
+        .center-ui { grid-column: 2 / 6; grid-row: 2 / 6; background: #fff5f7; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .sidebar { width: 300px; display: flex; flex-direction: column; gap: 15px; }
         .panel { background: white; border: 3px solid #ffb3d9; border-radius: 15px; padding: 15px; }
-        .panel h3 { margin: 0 0 10px 0; font-size: 14px; color: #ff59aa; border-bottom: 2px solid #ffe6f2; }
         .btn { width: 100%; padding: 10px; background: #ff80bf; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 900; }
-        .history { height: 150px; overflow-y: auto; font-size: 11px; color: #8a7c8c; background: #fff9fa; padding: 10px; border-radius: 8px; }
+        .history { height: 120px; overflow-y: auto; font-size: 11px; color: #8a7c8c; }
     </style>
 </head>
 <body>
@@ -26,55 +22,74 @@
 <div class="game-wrapper">
     <div class="board" id="board">
         <div class="center-ui">
-            <div id="turn-display">TURNO DE NAEUN (J1)</div>
+            <div id="turn-display">ESPERANDO JUGADOR...</div>
             <div style="font-size: 50px; cursor: pointer;" onclick="tirarDado()">🎲</div>
-            <button class="btn" style="background:#ff59aa;">COMPRAR PROPIEDAD</button>
+            <button class="btn" onclick="comprar()">COMPRAR PROPIEDAD</button>
         </div>
     </div>
 
     <div class="sidebar">
         <div class="panel">
             <h3>Conexión Multijugador</h3>
-            <div id="my-peer-id" style="font-size:12px; margin-bottom:5px;">Tu ID: barbie-game-123</div>
-            <input type="text" id="rival-peer-id" style="width:100%; margin-bottom:5px;">
-            <button class="btn">💎 CONECTAR</button>
+            <div id="my-peer-id" style="font-size:10px;">Generando ID...</div>
+            <input type="text" id="rival-peer-id" placeholder="ID del amigo" style="width:90%; margin: 5px 0;">
+            <button class="btn" onclick="conectar()">💎 CONECTAR</button>
         </div>
-
         <div class="panel">
             <h3>Bancos Individuales</h3>
-            <div style="font-size: 14px;">💖 Naeun: 1050 💎</div>
-            <div style="font-size: 14px;">💎 Seojun: 1320 💎</div>
+            <div id="dinero">💖 Tú: 1000 💎 | 💎 Amigo: 1000 💎</div>
         </div>
-
         <div class="panel">
-            <h3>Historial de la Villa</h3>
-            <div class="history" id="event-log">
-                [09:12] Conectado al servidor...<br>
-                [09:13] Naeun compró Boutique.
-            </div>
+            <h3>Historial</h3>
+            <div class="history" id="event-log">Conectando a la red...</div>
         </div>
-        <button class="btn" style="background:#ffccd5;">Reiniciar Todo</button>
     </div>
 </div>
 
 <script>
-    // Generar casillas del borde (simulación)
-    const board = document.getElementById('board');
-    for(let i=0; i<20; i++) {
-        const cell = document.createElement('div');
-        cell.className = 'cell';
-        cell.innerHTML = `<strong>TÉ</strong><br>$200 💎`;
-        board.appendChild(cell);
+    const peer = new Peer(); 
+    let conn;
+    let dinero = 1000;
+
+    peer.on('open', (id) => {
+        document.getElementById('my-peer-id').innerText = "Tu ID: " + id;
+        document.getElementById('event-log').innerHTML = "✅ Listo. Pásale tu ID.";
+    });
+
+    peer.on('connection', (c) => {
+        conn = c;
+        setupConn();
+    });
+
+    function conectar() {
+        const id = document.getElementById('rival-peer-id').value;
+        conn = peer.connect(id);
+        setupConn();
     }
-    
-    function log(msg) {
-        const logBox = document.getElementById('event-log');
-        logBox.innerHTML += `<br>[09:15] ${msg}`;
+
+    function setupConn() {
+        conn.on('open', () => document.getElementById('turn-display').innerText = "¡JUEGO INICIADO!");
+        conn.on('data', (data) => {
+            if(data.type === 'DADO') log("Amigo sacó: " + data.val);
+        });
     }
 
     function tirarDado() {
+        if(!conn) return alert("Conéctate primero");
         const val = Math.floor(Math.random()*6)+1;
-        log("Naeun tiró dado: " + val);
+        log("Sacaste: " + val);
+        conn.send({type: 'DADO', val: val});
+    }
+
+    function log(msg) {
+        const div = document.getElementById('event-log');
+        div.innerHTML += `<br> > ${msg}`;
+    }
+
+    function comprar() {
+        dinero -= 250;
+        document.getElementById('dinero').innerText = `💖 Tú: ${dinero} 💎 | 💎 Amigo: 1000 💎`;
+        log("¡Compraste propiedad!");
     }
 </script>
 </body>
