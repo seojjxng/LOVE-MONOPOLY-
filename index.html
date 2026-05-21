@@ -57,15 +57,15 @@
 
     let miIdx = -1, sala = "", miDinero = 1000;
     const nombres = ["Dog", "Horse", "Hat", "Car"];
-    const tonosPastel = ["#ffccd5", "#dcd0ff", "#c1e1c1", "#fff9c4"];
+    const colores = ["#ffccd5", "#dcd0ff", "#c1e1c1", "#fff9c4"];
     const mapa = [{n:"SALIDA",p:0},{n:"IGLESIA",p:100},{n:"?",p:0},{n:"BOUTIQUE",p:200},{n:"A LA CÁRCEL",p:0},{n:"CHEONGDAM",p:500},{n:"GANGNAM",p:520},{n:"SEOCHO-GU",p:250},{n:"MAPO",p:300},{n:"INCHEON",p:350},{n:"JOYAS",p:400},{n:"CÁRCEL",p:0},{n:"VILLA 3",p:220},{n:"?",p:0},{n:"ARCA",p:0},{n:"BUKCHON",p:500}];
 
     function unirse() {
         sala = document.getElementById('sala-id').value;
         db.ref('salas/' + sala + '/jugadores').once('value', snap => {
             miIdx = snap.numChildren();
-            if(miIdx > 3) { alert("Sala llena"); return; }
-            db.ref('salas/' + sala + '/jugadores/' + miIdx).set({ pos: 0, carcel: 0 });
+            if(miIdx > 3) return;
+            db.ref('salas/' + sala + '/jugadores/' + miIdx).set({ pos: 0, carcel: 0, dinero: 1000 });
             if(miIdx == 0) db.ref('salas/' + sala + '/turno').set(0);
             document.getElementById('p' + miIdx).style.display = 'block';
             sincronizar();
@@ -75,27 +75,45 @@
     function tirarDado() {
         if(miIdx === -1) return;
         db.ref('salas/' + sala).once('value', snap => {
-            if(snap.val().turno !== miIdx) { alert("No es tu turno"); return; }
+            if(snap.val().turno !== miIdx) return;
             let val = Math.floor(Math.random()*6)+1;
-            let posActual = snap.val().jugadores[miIdx].pos;
-            let nuevaPos = (posActual + val) % mapa.length;
-            let esCarcel = 0;
-            if(nuevaPos === 4) { nuevaPos = 11; esCarcel = 1; }
-            db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: nuevaPos, carcel: esCarcel });
+            let j = snap.val().jugadores[miIdx];
+            let pos = (j.pos + val) % mapa.length;
+            let carcel = (pos === 4) ? 1 : 0;
+            if(pos === 4) pos = 11;
+            db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: pos, carcel: carcel });
             db.ref('salas/' + sala + '/turno').set((snap.val().turno + 1) % snap.val().jugadores.length);
         });
+    }
+
+    function verificarCasilla(pos) {
+        let div = document.getElementById('acciones'); div.innerHTML = "";
+        db.ref('salas/' + sala + '/propiedades/' + pos).once('value', s => {
+            if(!s.exists() && mapa[pos].p > 0) div.innerHTML = `<button class="btn" onclick="comprar(${pos})">Comprar $${mapa[pos].p}</button>`;
+            else if(s.exists() && s.val().owner != miIdx) {
+                let rent = Math.floor(mapa[pos].p * (s.val().nivel === 1 ? 0.1 : s.val().nivel === 2 ? 0.15 : 0.25));
+                document.getElementById('log').innerHTML += `<div>Alquiler: $${rent}</div>`;
+            }
+        });
+    }
+
+    function comprar(pos) {
+        db.ref('salas/' + sala + '/propiedades/' + pos).set({ owner: miIdx, nivel: 1 });
     }
 
     function sincronizar() {
         db.ref('salas/' + sala).on('value', snap => {
             let s = snap.val();
-            if(!s || !s.jugadores) return;
+            if(!s) return;
             document.getElementById('turno-text').innerText = (s.turno == miIdx) ? "¡ES TU TURNO!" : "Esperando a " + nombres[s.turno];
             s.jugadores.forEach((j, i) => {
                 let el = document.getElementById('p' + i);
                 let cell = document.getElementById('cell-' + j.pos);
-                if(cell && el) { el.style.left = (cell.offsetLeft + 30) + 'px'; el.style.top = (cell.offsetTop + 30) + 'px'; }
+                if(cell && el) { el.style.left = (cell.offsetLeft + 30) + 'px'; el.style.top = (cell.offsetTop + 30) + 'px'; if(i == miIdx) verificarCasilla(j.pos); }
             });
+        });
+        db.ref('salas/' + sala + '/propiedades').on('value', snap => {
+            snap.forEach(c => document.getElementById('cell-'+c.key).style.backgroundColor = colores[c.val().owner]);
         });
     }
 
