@@ -6,19 +6,26 @@
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         body { background: #fff0f3; font-family: 'Montserrat', sans-serif; display: flex; justify-content: center; padding: 20px; color: #c71585; }
-        .container { display: flex; gap: 25px; width: 650px; }
-        /* Tablero organizado en 5x5 */
-        .board { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(5, 100px); gap: 5px; position: relative; }
-        .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: bold; text-align: center; }
-        .center-zone { grid-column: 2 / 5; grid-row: 2 / 5; background: #fff5f7; border: 3px dashed #ff80bf; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .token { width: 35px; height: 35px; position: absolute; z-index: 10; transition: all 0.5s ease; pointer-events: none; }
-        .btn { padding: 8px 15px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; margin: 5px; }
-        #modal { display: none; position: fixed; top: 30%; left: 40%; width: 300px; background: #fff0f9; border: 3px solid #ff80bf; padding: 20px; border-radius: 15px; z-index: 100; }
+        .container { display: flex; gap: 25px; width: 950px; }
+        .board { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(5, 100px); gap: 8px; background: #ffccd5; padding: 15px; border-radius: 25px; position: relative; }
+        .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; cursor: pointer; transition: 0.3s; }
+        .center-zone { grid-column: 2 / 5; grid-row: 2 / 5; background: #fff5f7; border: 3px dashed #ff80bf; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; }
+        .sidebar { width: 320px; display: flex; flex-direction: column; gap: 20px; }
+        .panel { background: #fff0f9; padding: 20px; border-radius: 20px; border: 2px solid #ffccd5; }
+        .btn { width: 70%; padding: 8px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin: 5px 0; font-size: 11px; }
+        .token { width: 35px; height: 35px; position: absolute; z-index: 10; transition: all 0.5s ease; pointer-events: none; border-radius: 5px; }
+        .dice { width: 60px; height: 60px; background: #ff59aa; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: bold; cursor: pointer; box-shadow: 0 5px #c71585; margin: 10px; }
+        #log { height: 180px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; }
+        #modal { display: none; position: fixed; top: 30%; left: 40%; width: 300px; background: #fff0f9; border: 3px solid #ff80bf; padding: 20px; border-radius: 15px; text-align: center; z-index: 100; box-shadow: 5px 5px 15px rgba(0,0,0,0.2); }
     </style>
 </head>
 <body>
 
-<div id="modal"><h3 id="modal-title">Suerte</h3><p id="modal-text"></p><button class="btn" onclick="document.getElementById('modal').style.display='none'">Cerrar</button></div>
+<div id="modal">
+    <h3 id="modal-title">¡Suerte!</h3>
+    <p id="modal-text"></p>
+    <button class="btn" onclick="document.getElementById('modal').style.display='none'">Cerrar</button>
+</div>
 
 <img src="https://i.imgur.com/FGnMi8Y.png" id="p1" class="token">
 <img src="https://i.imgur.com/fRZJfP8.png" id="p2" class="token">
@@ -26,36 +33,30 @@
 <div class="container">
     <div class="board" id="board">
         <div class="center-zone">
-            <div id="turno-text">ESPERANDO...</div>
-            <div class="dice" onclick="tirarDado()" style="cursor:pointer; font-size: 30px;">🎲</div>
-            <button class="btn" onclick="comprar()">COMPRAR</button>
-            <div>💖 $<span id="dinero-mio">1000</span></div>
+            <div id="turno-text" style="margin-bottom: 5px; font-size: 10px; font-weight: bold;">ESPERANDO...</div>
+            <div id="dice-result">-</div>
+            <div class="dice" onclick="tirarDado()">🎲</div>
+            <button class="btn" onclick="comprar()">COMPRAR / MEJORAR</button>
+            <div style="font-size: 12px; color: #c71585;">💖 Tú: $<span id="dinero-mio">1000</span> | 💎 Amigo: $<span id="dinero-amigo">1000</span></div>
         </div>
+    </div>
+    <div class="sidebar">
+        <div class="panel">
+            <strong>Conexión</strong>
+            <input type="text" id="peer-id" placeholder="ID amigo" style="width:100%; margin: 10px 0; padding: 5px;">
+            <button class="btn" style="width:100%" onclick="conectar()">Conectar</button>
+            <div id="my-id" style="font-size: 10px;">Generando ID...</div>
+        </div>
+        <div class="panel"><strong>Historial</strong><div id="log"></div></div>
     </div>
 </div>
 
 <script>
     const peer = new Peer();
     let conn, miTurno = false, miPos = 0, amigoPos = 0, miDinero = 1000;
-    
-    // Mapa organizado para el recorrido (4 lados de 4 celdas = 16 casillas)
-    const mapa = [
-        {n: "SALIDA", p:0}, {n: "TÉ", p:100, owner:null}, {n: "BOUTIQUE", p:200, owner:null}, {n: "SUERTE", p:0},
-        {n: "POLICÍA", p:0}, {n: "CAFÉ", p:150, owner:null}, {n: "PARQUE", p:120, owner:null}, {n: "SPA", p:250, owner:null},
-        {n: "VILLA", p:300, owner:null}, {n: "MALL", p:350, owner:null}, {n: "JOYAS", p:400, owner:null}, {n: "POLICÍA", p:0},
-        {n: "GYM", p:180, owner:null}, {n: "PRÉSTAMO", p:-200, owner:null}, {n: "VIVIENDA", p:500, owner:null}, {n: "EXTRA", p:0}
-    ];
+    const mapa = [{n: "SALIDA", p:0}, {n: "TÉ", p:100, owner:null}, {n: "BOUTIQUE", p:200, owner:null}, {n: "SUERTE", p:0}, {n: "CAFÉ", p:150, owner:null}, {n: "PARQUE", p:120, owner:null}, {n: "SPA", p:250, owner:null}, {n: "VILLA 1", p:300, owner:null}, {n: "MALL", p:350, owner:null}, {n: "JOYAS", p:400, owner:null}, {n: "VILLA 2", p:200, owner:null}, {n: "POLICÍA", p:0}, {n: "VILLA 3", p:220, owner:null}, {n: "GYM", p:180, owner:null}, {n: "PRÉSTAMO", p:-200, owner:null}, {n: "VIVIENDA", p:500, owner:null}];
 
-    function comprar() {
-        let casilla = mapa[miPos];
-        if (casilla.p > 0 && casilla.owner === null) {
-            miDinero -= casilla.p;
-            casilla.owner = 'yo';
-            document.getElementById('dinero-mio').innerText = miDinero;
-            document.getElementById('cell-' + miPos).style.background = "#ffccd5";
-            alert("¡Comprado!");
-        }
-    }
+    function log(m) { const l = document.getElementById('log'); l.innerHTML += `<div>> ${m}</div>`; l.scrollTop = l.scrollHeight; }
 
     function moverFichas() {
         ['p1', 'p2'].forEach((id, idx) => {
@@ -63,32 +64,47 @@
             const cell = document.getElementById('cell-' + pos);
             const rect = cell.getBoundingClientRect();
             const el = document.getElementById(id);
-            el.style.left = (rect.left + (idx * 20)) + 'px';
+            el.style.left = (rect.left + (id === 'p1' ? 5 : 40)) + 'px';
             el.style.top = (rect.top + 5) + 'px';
         });
+    }
+
+    function comprar() {
+        let actual = mapa[miPos];
+        if (actual.p > 0 && actual.owner === null) {
+            miDinero -= actual.p;
+            actual.owner = 'yo';
+            document.getElementById('dinero-mio').innerText = miDinero;
+            document.getElementById('cell-' + miPos).style.background = "#ffe4e9";
+            log("Has comprado " + actual.n);
+        } else { log("No se puede comprar aquí."); }
     }
 
     function tirarDado() {
         if(!miTurno) return;
         let val = Math.floor(Math.random()*6)+1;
-        let antiguaPos = miPos;
+        let prevPos = miPos;
         miPos = (miPos + val) % mapa.length;
-        
-        if (miPos < antiguaPos) { miDinero += 100; document.getElementById('dinero-mio').innerText = miDinero; }
-        
+        if(miPos < prevPos) { miDinero += 100; log("¡Pasaste por SALIDA: +$100!"); }
+        if(mapa[miPos].n === "SUERTE") {
+            let v = [300, 500, 50][Math.floor(Math.random()*3)];
+            miDinero += v;
+            document.getElementById('modal-text').innerText = "Ganaste $" + v + " por suerte.";
+            document.getElementById('modal').style.display = 'block';
+        }
+        document.getElementById('dinero-mio').innerText = miDinero;
         moverFichas();
-        conn.send({type: 'MOVE', pos: miPos});
+        if(conn) conn.send({type: 'MOVE', pos: miPos});
         miTurno = false;
     }
 
-    // Inicializar tablero
+    // Inicializar tablero visual
     const board = document.getElementById('board');
-    // Generamos las celdas en el orden visual del grid (derecha, abajo, izquierda, arriba)
-    for(let i=0; i<16; i++) {
+    mapa.forEach((m, i) => {
         const d = document.createElement('div');
-        d.className = 'cell'; d.id = 'cell-' + i; d.innerText = mapa[i].n;
+        d.className = 'cell'; d.id = 'cell-' + i; d.innerText = m.n;
         board.appendChild(d);
-    }
+    });
 
     peer.on('connection', c => { conn = c; miTurno = true; });
     setTimeout(moverFichas, 500);
