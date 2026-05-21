@@ -61,8 +61,8 @@
     function log(m) { const l = document.getElementById('log'); l.innerHTML += `<div>> ${m}</div>`; l.scrollTop = l.scrollHeight; }
 
     function moverFichas() {
-        const cell = document.getElementById('cell-' + miPos);
         const el = document.getElementById(esHost ? 'p1' : 'p2');
+        const cell = document.getElementById('cell-' + miPos);
         if(cell && el) {
             el.style.left = (cell.offsetLeft + (esHost ? 31 : 29)) + 'px';
             el.style.top = (cell.offsetTop + 30) + 'px';
@@ -73,31 +73,20 @@
         if(!juegoIniciado || !miTurno) return;
         let val = Math.floor(Math.random()*6)+1;
         let nuevaPos = miPos + val;
-        
-        // Verificar si pasaste por SALIDA (0)
-        if (nuevaPos >= mapa.length) {
-            miDinero += 100;
-            log("Pasaste por SALIDA: +$100");
-        }
-        
+        if (nuevaPos >= mapa.length) { miDinero += 100; log("Pasaste por SALIDA: +$100"); }
         miPos = nuevaPos % mapa.length;
         let actual = mapa[miPos];
-
-        // 1. Lógica de Bonificaciones (Suerte/Comunidad)
         if (actual.n === "SUERTE" || actual.n === "COMUNIDAD") {
             let azar = Math.floor(Math.random() * 200) - 100;
             miDinero += azar;
             log("Casilla " + actual.n + ": " + (azar >= 0 ? "+" : "") + azar + "$");
-        } 
-        // 2. Lógica de Alquiler
-        else if (actual.owner && actual.owner !== (esHost ? 'host' : 'visitante')) {
+        } else if (actual.owner && actual.owner !== (esHost ? 'host' : 'visitante')) {
             let mult = actual.up === 0 ? 0.1 : (actual.up === 1 ? 0.15 : 0.25);
             let alquiler = Math.floor(actual.p * mult);
             miDinero -= alquiler;
-            log("Pagaste $" + alquiler + " de renta (Nivel " + actual.up + ")");
+            log("Pagaste $" + alquiler + " de renta");
             if(conn) conn.send({type: 'PAY', amount: alquiler});
         }
-
         document.getElementById('dinero-mio').innerText = miDinero;
         moverFichas();
         if(conn) conn.send({type: 'MOVE', pos: miPos});
@@ -120,12 +109,7 @@
         let actual = mapa[miPos];
         if(actual.owner === (esHost ? 'host' : 'visitante') && actual.up < 2) {
             let costo = actual.p * 0.5;
-            if(miDinero >= costo) {
-                miDinero -= costo;
-                actual.up++;
-                document.getElementById('dinero-mio').innerText = miDinero;
-                log("Mejorado a nivel " + actual.up);
-            }
+            if(miDinero >= costo) { miDinero -= costo; actual.up++; document.getElementById('dinero-mio').innerText = miDinero; log("Mejorado a nivel " + actual.up); }
         }
     }
 
@@ -134,7 +118,15 @@
     function setupConn() {
         conn.on('open', () => { juegoIniciado = true; miTurno = esHost; log("Conectado."); });
         conn.on('data', d => {
-            if(d.type === 'MOVE') { miPos = d.pos; moverFichas(); miTurno = true; document.getElementById('turno-text').innerText = "¡TU TURNO!"; }
+            if(d.type === 'MOVE') {
+                const otraFicha = document.getElementById(esHost ? 'p2' : 'p1');
+                const cell = document.getElementById('cell-' + d.pos);
+                if(cell && otraFicha) {
+                    otraFicha.style.left = (cell.offsetLeft + (esHost ? 29 : 31)) + 'px';
+                    otraFicha.style.top = (cell.offsetTop + 30) + 'px';
+                }
+                miTurno = true; document.getElementById('turno-text').innerText = "¡TU TURNO!";
+            }
             if(d.type === 'PAY') { miDinero += d.amount; document.getElementById('dinero-mio').innerText = miDinero; }
         });
     }
