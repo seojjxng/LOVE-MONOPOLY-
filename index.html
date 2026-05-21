@@ -8,7 +8,7 @@
         body { background: #fff0f3; font-family: 'Montserrat', sans-serif; display: flex; justify-content: center; padding: 20px; color: #c71585; }
         .container { display: flex; gap: 25px; width: 950px; }
         .board { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(5, 100px); gap: 8px; background: #ffccd5; padding: 15px; border-radius: 25px; position: relative; }
-        .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; cursor: pointer; transition: 0.3s; }
+        .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; cursor: pointer; }
         .owned-host { background-color: #add8e6 !important; }
         .owned-visitante { background-color: #ffb6c1 !important; }
         .token { width: 35px; height: 35px; position: absolute; z-index: 10; transition: all 0.5s ease; pointer-events: none; }
@@ -19,6 +19,13 @@
         .input-field { width: 93%; padding: 8px; margin: 5px 0; border: 1px solid #ffccd5; border-radius: 8px; }
         .dice-img { width: 60px; height: 60px; cursor: pointer; margin: 10px; }
         #log { height: 300px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; }
+        
+        /* Ventanas estilo Windows */
+        .modal-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.3); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .window { width: 300px; background: #c0c0c0; border: 2px outset #fff; padding: 3px; font-family: sans-serif; }
+        .win-title { background: #000080; color: white; padding: 2px 5px; font-size: 12px; display: flex; justify-content: space-between; }
+        .win-body { padding: 15px; border: 1px inset #fff; background: white; margin-top: 3px; color: black; text-align: center; }
+        .win-btn { margin-top: 10px; padding: 5px 15px; border: 2px outset #fff; background: #c0c0c0; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -46,10 +53,18 @@
     </div>
 </div>
 
+<div id="modal" class="modal-overlay">
+    <div class="window">
+        <div class="win-title"><span>Sistema</span></div>
+        <div class="win-body" id="modal-text"></div>
+        <center><button class="win-btn" onclick="document.getElementById('modal').style.display='none'">Aceptar</button></center>
+    </div>
+</div>
+
 <script>
     const peer = new Peer();
     let conn, miTurno = false, miPos = 0, juegoIniciado = false, esHost = false;
-    let miDinero = 1000;
+    let miDinero = 1000, turnosRestantes = 0;
     
     const mapa = [
         {n: "SALIDA", p:0, up:0}, {n: "TÉ", p:100, owner:null, up:0}, {n: "SUERTE", p:0, up:0}, {n: "BOUTIQUE", p:200, owner:null, up:0}, 
@@ -59,97 +74,76 @@
     ];
 
     function log(m) { const l = document.getElementById('log'); l.innerHTML += `<div>> ${m}</div>`; l.scrollTop = l.scrollHeight; }
+    function mostrarVentana(txt) { document.getElementById('modal-text').innerText = txt; document.getElementById('modal').style.display = 'flex'; }
 
     function moverFichas() {
         const el = document.getElementById(esHost ? 'p1' : 'p2');
         const cell = document.getElementById('cell-' + miPos);
-        if(cell && el) {
-            el.style.left = (cell.offsetLeft + (esHost ? 31 : 29)) + 'px';
-            el.style.top = (cell.offsetTop + 30) + 'px';
-        }
+        if(cell && el) { el.style.left = (cell.offsetLeft + (esHost ? 31 : 29)) + 'px'; el.style.top = (cell.offsetTop + 30) + 'px'; }
     }
 
     function tirarDado() {
         if(!juegoIniciado || !miTurno) return;
         let val = Math.floor(Math.random()*6)+1;
-        let nuevaPos = miPos + val;
-        
-        if (nuevaPos >= mapa.length) { miDinero += 100; log("Pasaste por SALIDA: +$100"); }
-        miPos = nuevaPos % mapa.length;
+        let nuevaPos = (miPos + val) % mapa.length;
+        if(nuevaPos < miPos) { miDinero += 100; log("Pasaste por SALIDA: +$100"); }
+        miPos = nuevaPos;
         let actual = mapa[miPos];
 
-        // Lógica de Cárcel
         if (actual.n === "¡A LA CÁRCEL!") {
-            miPos = 11; // Posición de POLICÍA
-            log("¡A LA CÁRCEL! Turno perdido.");
-            alert("¡Oh no! Has sido enviado a la POLICÍA. Pierdes tu turno y el otro jugador recibe dos turnos seguidos.");
-            if(conn) conn.send({type: 'MOVE', pos: miPos, jail: true});
+            miPos = 11;
+            mostrarVentana("¡A LA CÁRCEL! Pierdes tu turno.");
+            if(conn) conn.send({type: 'JAIL'});
             miTurno = false;
             document.getElementById('turno-text').innerText = "ESPERANDO...";
-        } 
-        // Lógica de Suerte
-        else if (actual.n === "SUERTE") {
+        } else if (actual.n === "SUERTE") {
             let azar = Math.floor(Math.random() * 200) - 100;
             miDinero += azar;
-            alert("CARTA DE SUERTE: " + (azar >= 0 ? "¡Has ganado " : "Has perdido ") + Math.abs(azar) + "$ por causas del destino.");
-            log("Suerte: " + azar + "$");
+            mostrarVentana("SUERTE: " + (azar >= 0 ? "Ganaste " : "Perdiste ") + Math.abs(azar) + "$");
+            gestionarTurnoFinal();
+        } else if (actual.n === "COMUNIDAD") {
+            miDinero -= 80;
+            mostrarVentana("COMUNIDAD: Pagaste $80.");
+            gestionarTurnoFinal();
+        } else {
+            if (actual.owner && actual.owner !== (esHost ? 'host' : 'visitante')) {
+                let alq = Math.floor(actual.p * (actual.up === 0 ? 0.1 : (actual.up === 1 ? 0.15 : 0.25)));
+                miDinero -= alq;
+                if(conn) conn.send({type: 'PAY', amount: alq});
+            }
+            gestionarTurnoFinal();
         }
-        // Lógica de Comunidad
-        else if (actual.n === "COMUNIDAD") {
-            let pago = 80;
-            miDinero -= pago;
-            alert("CARTA DE COMUNIDAD: Has tenido que pagar " + pago + "$ por mantenimiento de servicios públicos.");
-            log("Comunidad: -$80");
-        }
-        // Lógica de Alquiler
-        else if (actual.owner && actual.owner !== (esHost ? 'host' : 'visitante')) {
-            let mult = actual.up === 0 ? 0.1 : (actual.up === 1 ? 0.15 : 0.25);
-            let alquiler = Math.floor(actual.p * mult);
-            miDinero -= alquiler;
-            log("Pagaste $" + alquiler + " de renta");
-            if(conn) conn.send({type: 'PAY', amount: alquiler});
-        }
-
         document.getElementById('dinero-mio').innerText = miDinero;
         moverFichas();
         if(conn && actual.n !== "¡A LA CÁRCEL!") conn.send({type: 'MOVE', pos: miPos});
     }
 
-    function comprar() {
-        let actual = mapa[miPos];
-        if(!actual.owner && actual.p > 0 && miDinero >= actual.p) {
-            miDinero -= actual.p;
-            actual.owner = esHost ? 'host' : 'visitante';
-            document.getElementById('cell-' + miPos).classList.add(esHost ? 'owned-host' : 'owned-visitante');
-            document.getElementById('dinero-mio').innerText = miDinero;
-            log("Compraste " + actual.n);
-        }
-    }
-
-    function mejorar() {
-        let actual = mapa[miPos];
-        if(actual.owner === (esHost ? 'host' : 'visitante') && actual.up < 2) {
-            let costo = actual.p * 0.5;
-            if(miDinero >= costo) { miDinero -= costo; actual.up++; document.getElementById('dinero-mio').innerText = miDinero; log("Mejorado a nivel " + actual.up); }
+    function gestionarTurnoFinal() {
+        if(turnosRestantes > 0) {
+            turnosRestantes--;
+            if(turnosRestantes === 0) {
+                miTurno = false;
+                document.getElementById('turno-text').innerText = "ESPERANDO...";
+                conn.send({type: 'PASS_TURN'});
+            }
+        } else {
+            miTurno = false;
+            document.getElementById('turno-text').innerText = "ESPERANDO...";
+            conn.send({type: 'PASS_TURN'});
         }
     }
 
     function conectar() { esHost = true; conn = peer.connect(document.getElementById('peer-id').value); setupConn(); }
-
     function setupConn() {
         conn.on('open', () => { juegoIniciado = true; miTurno = esHost; log("Conectado."); });
         conn.on('data', d => {
             if(d.type === 'MOVE') {
-                const otraFicha = document.getElementById(esHost ? 'p2' : 'p1');
+                const otra = document.getElementById(esHost ? 'p2' : 'p1');
                 const cell = document.getElementById('cell-' + d.pos);
-                if(cell && otraFicha) {
-                    otraFicha.style.left = (cell.offsetLeft + (esHost ? 29 : 31)) + 'px';
-                    otraFicha.style.top = (cell.offsetTop + 30) + 'px';
-                }
-                // Si el otro fue a la cárcel, el receptor recibe 2 turnos (miTurno = true por defecto)
-                miTurno = d.jail ? true : true; 
-                document.getElementById('turno-text').innerText = "¡TU TURNO!";
+                if(cell && otra) { otra.style.left = (cell.offsetLeft + (esHost?29:31))+'px'; otra.style.top = (cell.offsetTop+30)+'px'; }
             }
+            if(d.type === 'JAIL') { turnosRestantes = 2; miTurno = true; document.getElementById('turno-text').innerText = "¡DOBLE TURNO!"; }
+            if(d.type === 'PASS_TURN') { miTurno = true; document.getElementById('turno-text').innerText = "¡TU TURNO!"; }
             if(d.type === 'PAY') { miDinero += d.amount; document.getElementById('dinero-mio').innerText = miDinero; }
         });
     }
