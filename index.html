@@ -50,40 +50,41 @@
     const peer = new Peer();
     let miIdx = 0, hostConn = null, turnoActual = 0;
     let posiciones = [0, 0, 0, 0];
-    let listaConexiones = []; // Lista maestra para el Host
+    let conexiones = []; // El host guarda a todos aquí
     const nombres = ["Dog", "Horse", "Hat", "Car"];
 
     function log(m) { const l = document.getElementById('log'); l.innerHTML += `<div>> ${m}</div>`; l.scrollTop = l.scrollHeight; }
 
     peer.on('open', id => document.getElementById('my-id').innerText = "ID: " + id);
 
-    // LÓGICA DEL HOST
+    // ESCUCHA DEL HOST
     peer.on('connection', conn => {
-        let nuevoIdx = listaConexiones.length + 1;
-        listaConexiones.push({id: nuevoIdx, conn: conn});
+        let nuevoIdx = conexiones.length + 1;
+        conexiones.push({idx: nuevoIdx, conn: conn});
         
         conn.on('data', data => {
-            // El Host recibe un movimiento y se lo reenvía a TODOS
+            // El Host recibe movimiento y lo reenvía a TODOS (incluido el emisor para confirmar)
             if(data.type === 'MOVE') {
                 posiciones[data.idx] = data.pos;
-                turnoActual = (data.idx + 1) % (listaConexiones.length + 1);
-                
-                // Broadcast a todos
+                turnoActual = (data.idx + 1) % 4;
                 let payload = {type: 'UPDATE', pos: posiciones, turn: turnoActual};
-                listaConexiones.forEach(c => c.conn.send(payload));
+                
+                // Retransmitir a TODOS los conectados
+                conexiones.forEach(c => c.conn.send(payload));
+                // Actualizar localmente al Host
                 actualizarJuego(payload);
             }
         });
         
-        conn.send({type: 'WELCOME', idx: nuevoIdx});
+        conn.send({type: 'WELCOME', idx: nuevoIdx, pos: posiciones});
         log(nombres[nuevoIdx] + " se ha unido.");
     });
 
-    // LÓGICA DEL INVITADO
+    // ESCUCHA DEL INVITADO
     function conectar() {
         hostConn = peer.connect(document.getElementById('peer-id').value);
         hostConn.on('data', data => {
-            if(data.type === 'WELCOME') miIdx = data.idx;
+            if(data.type === 'WELCOME') { miIdx = data.idx; posiciones = data.pos; actualizarJuego({pos: posiciones, turn: 0}); }
             if(data.type === 'UPDATE') actualizarJuego(data);
         });
     }
@@ -105,13 +106,13 @@
         let nuevaPos = (posiciones[miIdx] + Math.floor(Math.random()*6)+1) % 16;
         let d = {type: 'MOVE', idx: miIdx, pos: nuevaPos};
         
-        if(miIdx === 0) { // Soy el Host
+        if(miIdx === 0) { // Si soy el Host, proceso yo mismo
             posiciones[miIdx] = nuevaPos;
-            turnoActual = 1;
+            turnoActual = (miIdx + 1) % 4;
             let payload = {type: 'UPDATE', pos: posiciones, turn: turnoActual};
-            listaConexiones.forEach(c => c.conn.send(payload));
+            conexiones.forEach(c => c.conn.send(payload));
             actualizarJuego(payload);
-        } else { // Soy Invitado
+        } else { // Si soy invitado, envío al Host
             hostConn.send(d);
         }
     }
