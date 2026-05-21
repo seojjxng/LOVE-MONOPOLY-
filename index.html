@@ -14,17 +14,13 @@
         .panel { background: #fff0f9; padding: 20px; border-radius: 20px; border: 2px solid #ffccd5; }
         .btn { width: 70%; padding: 8px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin: 5px 0; font-size: 11px; }
         
-        /* Dado Rosa CSS */
         .dice { width: 60px; height: 60px; background: #ff59aa; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: bold; cursor: pointer; box-shadow: 0 5px #c71585; margin: 10px; transition: transform 0.2s; }
         .dice:active { transform: translateY(4px); box-shadow: 0 1px #c71585; }
 
         #log { height: 180px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; }
-        #modal { display: none; position: fixed; top: 30%; left: 40%; width: 300px; background: #fff0f9; border: 3px solid #ff80bf; padding: 20px; border-radius: 15px; text-align: center; z-index: 100; }
     </style>
 </head>
 <body>
-
-<div id="modal"><h3 id="modal-text">¡Suerte!</h3><button class="btn" onclick="document.getElementById('modal').style.display='none'">Cerrar</button></div>
 
 <div class="container">
     <div class="board" id="board">
@@ -33,7 +29,7 @@
             <div id="dice-result">-</div>
             <div class="dice" onclick="tirarDado()">🎲</div>
             <button class="btn" onclick="comprar()">COMPRAR / MEJORAR</button>
-            <div class="banco-display" style="font-size: 12px; color: #c71585;">💖 Tú: $<span id="dinero-mio">1000</span> | 💎 Amigo: $<span id="dinero-amigo">1000</span></div>
+            <div style="font-size: 12px; color: #c71585; margin-top: 10px;">💖 Tú: $<span id="dinero-mio">1000</span> | 💎 Amigo: $<span id="dinero-amigo">1000</span></div>
         </div>
     </div>
     <div class="sidebar">
@@ -54,21 +50,27 @@
 
     function log(m) { const l = document.getElementById('log'); l.innerHTML += `<div>> ${m}</div>`; l.scrollTop = l.scrollHeight; }
 
+    function actualizarTurnoUI() {
+        document.getElementById('turno-text').innerText = miTurno ? "¡ES TU TURNO!" : "ESPERANDO...";
+    }
+
     function tirarDado() {
         if(!miTurno) return;
-        if(bloqueado) { log("¡Turno perdido en POLICÍA!"); bloqueado = false; miTurno = false; conn.send({type: 'MOVE', pos: miPos, lock: false}); document.getElementById('turno-text').innerText = "ESPERANDO..."; return; }
+        if(bloqueado) { log("¡Turno perdido!"); bloqueado = false; miTurno = false; conn.send({type: 'MOVE', pos: miPos, lock: false}); actualizarTurnoUI(); return; }
         
         let val = Math.floor(Math.random()*6)+1;
         document.getElementById('dice-result').innerText = val;
         let viejaPos = miPos;
         miPos = (miPos + val) % mapa.length;
         if (miPos < viejaPos) { miDinero += 100; log("Salida: +$100"); }
+        
         let caePolicia = (mapa[miPos].n === "POLICÍA");
         if(caePolicia) { log("¡Cuidado, POLICÍA!"); bloqueado = true; }
+        
         log("Caíste en " + mapa[miPos].n);
         conn.send({type: 'MOVE', pos: miPos, lock: caePolicia});
         miTurno = false;
-        document.getElementById('turno-text').innerText = "ESPERANDO...";
+        actualizarTurnoUI();
         log("Le toca a tu amorcito!");
     }
 
@@ -78,27 +80,20 @@
     function conectar() { 
         conn = peer.connect(document.getElementById('peer-id').value); 
         setup(); 
-        // Asignar turno al azar al conectar
-        miTurno = Math.random() > 0.5;
-        conn.send({type: 'START', turno: !miTurno});
+        miTurno = Math.random() > 0.5; // El que conecta decide al azar
+        conn.send({type: 'START', turno: !miTurno}); // Avisa al otro
         actualizarTurnoUI();
         log("¡Conexión establecida!");
-    }
-
-    function actualizarTurnoUI() {
-        document.getElementById('turno-text').innerText = miTurno ? "¡ES TU TURNO!" : "ESPERANDO...";
-        if(miTurno) log("¡Te toca lanzar!");
     }
 
     function setup() {
         conn.on('data', d => {
             if (d.type === 'START') { miTurno = d.turno; actualizarTurnoUI(); }
-            if (d.type === 'MOVE') { miTurno = true; bloqueado = d.lock; document.getElementById('turno-text').innerText = "¡ES TU TURNO!"; log("¡Te toca lanzar!"); }
+            if (d.type === 'MOVE') { miTurno = true; bloqueado = d.lock; actualizarTurnoUI(); log("¡Te toca lanzar!"); }
         });
     }
 
-    const board = document.getElementById('board');
-    mapa.forEach((m, i) => { const d = document.createElement('div'); d.className = 'cell'; d.id = 'cell-' + i; d.innerText = m.n; board.appendChild(d); });
+    mapa.forEach((m, i) => { const d = document.createElement('div'); d.className = 'cell'; d.id = 'cell-' + i; d.innerText = m.n; document.getElementById('board').appendChild(d); });
 </script>
 </body>
 </html>
