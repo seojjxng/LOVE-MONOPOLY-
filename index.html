@@ -55,7 +55,7 @@
 </div>
 
 <script>
-    // Configuración para mayor estabilidad de conexión
+    // Configuración para mayor estabilidad
     const peer = new Peer(undefined, {
         host: '0.peerjs.com',
         port: 443,
@@ -64,34 +64,40 @@
 
     let conn;
 
+    // 1. Cuando yo estoy listo
     peer.on('open', (id) => {
         document.getElementById('my-peer-id').innerText = id;
-        document.getElementById('event-log').innerText = "✅ Listo. Pásale este ID a tu amigo.";
+        document.getElementById('event-log').innerText = "✅ Listo. Esperando a conectar...";
     });
 
-    peer.on('error', (err) => {
-        document.getElementById('event-log').innerText = "❌ Error: " + err.type;
-        console.error(err);
-    });
-
+    // 2. Cuando alguien se conecta a MÍ
     peer.on('connection', (c) => {
         conn = c;
-        setupEvents();
+        setupConnection();
     });
 
+    // 3. Función para que el jugador 2 inicie la conexión
     function conectar() {
         const peerID = document.getElementById('rival-peer-id').value;
         if (!peerID) return;
         conn = peer.connect(peerID);
-        setupEvents();
+        setupConnection();
     }
 
-    function setupEvents() {
+    // 4. Esta función es la que "aprieta" la conexión para ambos
+    function setupConnection() {
+        // Esto se ejecuta cuando la conexión ya es real
         conn.on('open', () => {
-            document.getElementById('event-log').innerText = "💎 ¡Conexión establecida!";
+            document.getElementById('event-log').innerText = "💎 ¡CONEXIÓN ESTABLECIDA!";
+            document.body.style.backgroundColor = "#e8ffea"; // Feedback visual: cambia a verde suave
         });
+
         conn.on('data', (data) => {
-            alert("Recibido: " + data);
+            alert("Recibiste: " + data);
+        });
+
+        conn.on('error', (err) => {
+            document.getElementById('event-log').innerText = "❌ Error de conexión";
         });
     }
 </script>
