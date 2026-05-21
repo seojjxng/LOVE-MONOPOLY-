@@ -8,10 +8,10 @@
     <style>
         body { background: #fff0f3; font-family: 'Montserrat', sans-serif; display: flex; justify-content: center; padding: 20px; color: #c71585; }
         .container { display: flex; gap: 25px; width: 1000px; }
-        .board { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(4, 100px); gap: 8px; background: #ffccd5; padding: 15px; border-radius: 25px; position: relative; }
+        .board { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(6, 100px); gap: 8px; background: #ffccd5; padding: 15px; border-radius: 25px; position: relative; }
         .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; }
         .token { width: 35px; height: 35px; position: absolute; z-index: 10; transition: all 0.5s ease; pointer-events: none; }
-        .center-zone { grid-column: 2 / 5; grid-row: 2 / 3; background: #fff5f7; border: 3px dashed #ff80bf; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; }
+        .center-zone { grid-column: 2 / 5; grid-row: 2 / 5; background: #fff5f7; border: 3px dashed #ff80bf; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; }
         .sidebar { width: 320px; display: flex; flex-direction: column; gap: 20px; }
         .panel { background: #fff0f9; padding: 20px; border-radius: 20px; border: 2px solid #ffccd5; }
         .btn { width: 100%; padding: 10px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin: 5px 0; font-size: 12px; transition: transform 0.2s, background 0.2s; }
@@ -20,7 +20,7 @@
         #log, #chat-log { height: 150px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; margin-bottom: 10px; }
         #modal, #contrato-modal { display: none; position: fixed; top: 20%; left: 35%; width: 300px; background: #ffe4e9; padding: 20px; border: 3px solid #ff80bf; border-radius: 15px; text-align: center; z-index: 999; box-shadow: 5px 5px 15px rgba(0,0,0,0.1); }
         #dado-valor { font-size: 24px; font-weight: bold; margin: 10px 0; }
-        #banco-container { grid-column: 1 / 6; grid-row: 4 / 5; display: flex; align-items: center; justify-content: center; background: #ffccd5; border-radius: 15px; }
+        #banco-container { grid-column: 1 / 6; grid-row: 6 / 7; display: flex; align-items: center; justify-content: center; background: #ffccd5; border-radius: 15px; }
     </style>
 </head>
 <body>
@@ -118,7 +118,7 @@
                         dinero: (j.dinero || 0) + (ingreso - pago),
                         deuda: deuda - pago
                     });
-                    log("Salida: +$"+ingreso+" (Banco retuvo $"+pago+" de tu deuda)");
+                    log("Salida: +$"+ingreso+" (Banco retuvo $"+pago+" de deuda)");
                 } else {
                     db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => (d || 0) + ingreso);
                     log("Pasaste por SALIDA: +$100");
@@ -128,7 +128,7 @@
             
             if(nuevaPos === 4) { 
                 db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: 11, enCarcel: true }); 
-                log(nombres[miIdx] + " fue arrestado.");
+                log(nombres[miIdx] + " en cárcel.");
             } else { 
                 db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: nuevaPos }); 
                 verificarCasilla(nuevaPos, j.dinero);
@@ -160,7 +160,6 @@
     function verificarCasilla(pos, dinero) {
         let div = document.getElementById('acciones'); div.innerHTML = "";
         let propRef = db.ref('salas/' + sala + '/propiedades/' + pos);
-        
         if(pos === 12) {
             let impuestos = ["Prendas", "Agua", "Luz"];
             let tipo = impuestos[Math.floor(Math.random()*impuestos.length)];
@@ -172,7 +171,6 @@
             log("Impuesto de " + tipo + ": -$ " + monto);
             return;
         }
-
         propRef.once('value', s => {
             let prop = s.val();
             if(!prop && mapa[pos].p > 0) {
@@ -185,15 +183,10 @@
                 db.ref('salas/' + sala + '/jugadores/' + miIdx).once('value', snap => {
                     let j = snap.val();
                     let pagoReal = Math.min(renta, j.dinero);
-                    let deuda = j.deuda || 0;
                     let retencion = Math.floor(pagoReal * 0.5);
-                    
-                    db.ref('salas/' + sala + '/jugadores/' + miIdx).update({
-                        dinero: (j.dinero || 0) - pagoReal,
-                        deuda: deuda - retencion
-                    });
+                    db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ dinero: (j.dinero || 0) - pagoReal, deuda: (j.deuda || 0) - retencion });
                     db.ref('salas/' + sala + '/jugadores/' + prop.owner + '/dinero').transaction(d => (d || 0) + (pagoReal - retencion));
-                    log("Pagaste $" + pagoReal + " de alquiler (Banco retuvo $"+retencion+").");
+                    log("Alquiler pagado: $" + pagoReal + " (Banco retuvo $"+retencion+").");
                 });
             } else if(mapa[pos].n == "?" || mapa[pos].n == "ARCA") {
                 let ev = eventos[Math.floor(Math.random()*eventos.length)];
@@ -206,41 +199,10 @@
         });
     }
 
-    function comprar(pos) {
-        db.ref('salas/' + sala + '/propiedades/' + pos).set({ owner: miIdx, nivel: 1 });
-        db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d - mapa[pos].p);
-        log("Compraste " + mapa[pos].n);
-    }
-
-    function mejorar(pos, costo) {
-        db.ref('salas/' + sala + '/propiedades/' + pos + '/nivel').transaction(n => (n || 1) + 1);
-        db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d - costo);
-        log("Mejoraste propiedad.");
-        document.getElementById('acciones').innerHTML = "";
-    }
-
-    function enviarChat() {
-        let msg = document.getElementById('chat-msg').value;
-        let t = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-        db.ref('salas/' + sala + '/chat').push({ n: nombres[miIdx], m: msg, t: t });
-        document.getElementById('chat-msg').value = "";
-    }
-
-    function sincronizar() {
-        db.ref('salas/' + sala).on('value', snap => {
-            let s = snap.val(); if(!s) return;
-            document.getElementById('dinero-mio').innerText = s.jugadores[miIdx].dinero;
-            document.getElementById('turno-text').innerText = "Turno de: " + nombres[s.turno];
-            s.jugadores.forEach((j, i) => {
-                let el = document.getElementById('p' + i); el.style.display = 'block';
-                let cell = document.getElementById('cell-' + j.pos);
-                if(cell) { el.style.left = (cell.offsetLeft + 15 + (i*8)) + 'px'; el.style.top = (cell.offsetTop + 15) + 'px'; }
-            });
-            if(s.propiedades) Object.keys(s.propiedades).forEach(p => { let cell = document.getElementById('cell-'+p); if(cell) cell.style.backgroundColor = colores[s.propiedades[p].owner]; });
-            if(s.chat) { let html = ""; Object.values(s.chat).forEach(c => html += `<div><b>${c.n}</b> [${c.t}]: ${c.m}</div>`); document.getElementById('chat-log').innerHTML = html; }
-        });
-    }
-
+    function comprar(pos) { db.ref('salas/' + sala + '/propiedades/' + pos).set({ owner: miIdx, nivel: 1 }); db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d - mapa[pos].p); log("Compraste " + mapa[pos].n); }
+    function mejorar(pos, costo) { db.ref('salas/' + sala + '/propiedades/' + pos + '/nivel').transaction(n => (n || 1) + 1); db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d - costo); log("Mejoraste propiedad."); document.getElementById('acciones').innerHTML = ""; }
+    function enviarChat() { let msg = document.getElementById('chat-msg').value; let t = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); db.ref('salas/' + sala + '/chat').push({ n: nombres[miIdx], m: msg, t: t }); document.getElementById('chat-msg').value = ""; }
+    function sincronizar() { db.ref('salas/' + sala).on('value', snap => { let s = snap.val(); if(!s) return; document.getElementById('dinero-mio').innerText = s.jugadores[miIdx].dinero; document.getElementById('turno-text').innerText = "Turno de: " + nombres[s.turno]; s.jugadores.forEach((j, i) => { let el = document.getElementById('p' + i); el.style.display = 'block'; let cell = document.getElementById('cell-' + j.pos); if(cell) { el.style.left = (cell.offsetLeft + 15 + (i*8)) + 'px'; el.style.top = (cell.offsetTop + 15) + 'px'; } }); if(s.propiedades) Object.keys(s.propiedades).forEach(p => { let cell = document.getElementById('cell-'+p); if(cell) cell.style.backgroundColor = colores[s.propiedades[p].owner]; }); if(s.chat) { let html = ""; Object.values(s.chat).forEach(c => html += `<div><b>${c.n}</b> [${c.t}]: ${c.m}</div>`); document.getElementById('chat-log').innerHTML = html; } }); }
     mapa.forEach((m, i) => { const d = document.createElement('div'); d.className = 'cell'; d.id = 'cell-' + i; d.innerHTML = `${m.n}<br>${m.p > 0 ? '$'+m.p : ''}`; document.getElementById('board').appendChild(d); });
 </script>
 </body>
