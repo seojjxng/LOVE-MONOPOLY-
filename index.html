@@ -55,19 +55,21 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    let miIdx = -1, sala = "", miDinero = 1000;
+    let miIdx = -1, sala = "";
     const nombres = ["Dog", "Horse", "Hat", "Car"];
     const colores = ["#ffccd5", "#dcd0ff", "#c1e1c1", "#fff9c4"];
     const mapa = [{n:"SALIDA",p:0},{n:"IGLESIA",p:100},{n:"?",p:0},{n:"BOUTIQUE",p:200},{n:"A LA CÁRCEL",p:0},{n:"CHEONGDAM",p:500},{n:"GANGNAM",p:520},{n:"SEOCHO-GU",p:250},{n:"MAPO",p:300},{n:"INCHEON",p:350},{n:"JOYAS",p:400},{n:"CÁRCEL",p:0},{n:"VILLA 3",p:220},{n:"?",p:0},{n:"ARCA",p:0},{n:"BUKCHON",p:500}];
+
+    function log(txt) { document.getElementById('log').innerHTML += `<div>${txt}</div>`; }
 
     function unirse() {
         sala = document.getElementById('sala-id').value;
         db.ref('salas/' + sala + '/jugadores').once('value', snap => {
             miIdx = snap.numChildren();
-            if(miIdx > 3) return;
-            db.ref('salas/' + sala + '/jugadores/' + miIdx).set({ pos: 0, carcel: 0, dinero: 1000 });
+            db.ref('salas/' + sala + '/jugadores/' + miIdx).set({ pos: 0, dinero: 1000 });
             if(miIdx == 0) db.ref('salas/' + sala + '/turno').set(0);
             document.getElementById('p' + miIdx).style.display = 'block';
+            log(nombres[miIdx] + " entró a la sala.");
             sincronizar();
         });
     }
@@ -76,44 +78,64 @@
         if(miIdx === -1) return;
         db.ref('salas/' + sala).once('value', snap => {
             if(snap.val().turno !== miIdx) return;
-            let val = Math.floor(Math.random()*6)+1;
             let j = snap.val().jugadores[miIdx];
+            let val = Math.floor(Math.random()*6)+1;
             let pos = (j.pos + val) % mapa.length;
-            let carcel = (pos === 4) ? 1 : 0;
-            if(pos === 4) pos = 11;
-            db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: pos, carcel: carcel });
+            
+            if(pos === 4) { pos = 11; log("¡" + nombres[miIdx] + " fue a la cárcel!"); }
+            if(pos < j.pos) j.dinero += 100;
+            
+            db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: pos, dinero: j.dinero });
+            verificarCasilla(pos, j.dinero);
             db.ref('salas/' + sala + '/turno').set((snap.val().turno + 1) % snap.val().jugadores.length);
         });
     }
 
-    function verificarCasilla(pos) {
+    function verificarCasilla(pos, dinero) {
         let div = document.getElementById('acciones'); div.innerHTML = "";
-        db.ref('salas/' + sala + '/propiedades/' + pos).once('value', s => {
-            if(!s.exists() && mapa[pos].p > 0) div.innerHTML = `<button class="btn" onclick="comprar(${pos})">Comprar $${mapa[pos].p}</button>`;
-            else if(s.exists() && s.val().owner != miIdx) {
-                let rent = Math.floor(mapa[pos].p * (s.val().nivel === 1 ? 0.1 : s.val().nivel === 2 ? 0.15 : 0.25));
-                document.getElementById('log').innerHTML += `<div>Alquiler: $${rent}</div>`;
-            }
-        });
+        let tipo = mapa[pos].n;
+        if(tipo === "?" || tipo === "ARCA") {
+            let m = Math.floor(Math.random()*200)+50;
+            let g = Math.random() > 0.5;
+            db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').set(dinero + (g ? m : -m));
+            document.getElementById('modal-text').innerText = (g ? "Ganaste " : "Perdiste ") + "$" + m;
+            document.getElementById('modal').style.display = 'block';
+            log((g ? "Ganó $" : "Perdió $") + m + " en " + tipo);
+        } else {
+            db.ref('salas/' + sala + '/propiedades/' + pos).once('value', s => {
+                if(!s.exists() && mapa[pos].p > 0) div.innerHTML = `<button class="btn" onclick="comprar(${pos})">Comprar $${mapa[pos].p}</button>`;
+                else if(s.exists() && s.val().owner != miIdx) {
+                    let rent = Math.floor(mapa[pos].p * 0.1);
+                    db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d - rent);
+                    db.ref('salas/' + sala + '/jugadores/' + s.val().owner + '/dinero').transaction(d => d + rent);
+                    log("Alquiler: " + nombres[miIdx] + " pagó $" + rent + " a " + nombres[s.val().owner]);
+                }
+            });
+        }
     }
 
     function comprar(pos) {
         db.ref('salas/' + sala + '/propiedades/' + pos).set({ owner: miIdx, nivel: 1 });
+        db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d - mapa[pos].p);
+        log(nombres[miIdx] + " compró " + mapa[pos].n);
     }
 
     function sincronizar() {
         db.ref('salas/' + sala).on('value', snap => {
             let s = snap.val();
             if(!s) return;
+            document.getElementById('dinero-mio').innerText = s.jugadores[miIdx].dinero;
             document.getElementById('turno-text').innerText = (s.turno == miIdx) ? "¡ES TU TURNO!" : "Esperando a " + nombres[s.turno];
             s.jugadores.forEach((j, i) => {
                 let el = document.getElementById('p' + i);
                 let cell = document.getElementById('cell-' + j.pos);
-                if(cell && el) { el.style.left = (cell.offsetLeft + 30) + 'px'; el.style.top = (cell.offsetTop + 30) + 'px'; if(i == miIdx) verificarCasilla(j.pos); }
+                if(cell && el) { el.style.left = (cell.offsetLeft + 30) + 'px'; el.style.top = (cell.offsetTop + 30) + 'px'; }
             });
-        });
-        db.ref('salas/' + sala + '/propiedades').on('value', snap => {
-            snap.forEach(c => document.getElementById('cell-'+c.key).style.backgroundColor = colores[c.val().owner]);
+            if(s.propiedades) {
+                Object.keys(s.propiedades).forEach(p => {
+                    document.getElementById('cell-'+p).style.backgroundColor = colores[s.propiedades[p].owner];
+                });
+            }
         });
     }
 
