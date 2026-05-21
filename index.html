@@ -8,12 +8,13 @@
         body { background: #fff0f3; font-family: 'Montserrat', sans-serif; display: flex; justify-content: center; padding: 20px; color: #c71585; }
         .container { display: flex; gap: 25px; width: 950px; }
         .board { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(5, 100px); gap: 8px; background: #ffccd5; padding: 15px; border-radius: 25px; position: relative; }
-        .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; cursor: pointer; }
+        .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; cursor: pointer; transition: 0.3s; }
+        .cell.owned { background: #ffdae0; border-color: #ff59aa; }
         .center-zone { grid-column: 2 / 5; grid-row: 2 / 5; background: #fff5f7; border: 3px dashed #ff80bf; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; }
         .sidebar { width: 320px; display: flex; flex-direction: column; gap: 20px; }
         .panel { background: #fff0f9; padding: 20px; border-radius: 20px; border: 2px solid #ffccd5; }
         .btn { width: 70%; padding: 8px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin: 5px 0; font-size: 11px; }
-        .token { width: 35px; height: 35px; position: absolute; z-index: 10; transition: all 0.5s ease; pointer-events: none; border-radius: 5px; }
+        .token { width: 35px; height: 35px; position: absolute; z-index: 10; transition: all 0.5s ease; pointer-events: none; }
         .dice-img { width: 60px; height: 60px; cursor: pointer; transition: transform 0.2s; margin: 10px; }
         #log { height: 180px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; }
         #modal { display: none; position: fixed; top: 30%; left: 40%; width: 300px; background: #fff0f9; border: 3px solid #ff80bf; padding: 20px; border-radius: 15px; text-align: center; z-index: 100; box-shadow: 5px 5px 15px rgba(0,0,0,0.2); }
@@ -34,7 +35,7 @@
     <div class="board" id="board">
         <div class="center-zone">
             <div id="turno-text">ESPERANDO...</div>
-            <div id="dice-val" style="font-size: 20px; font-weight: bold;">-</div>
+            <div id="dice-val">-</div>
             <img src="https://i.imgur.com/Nsafzb4.png" class="dice-img" onclick="tirarDado()">
             <button class="btn" onclick="comprar()">COMPRAR CASILLA</button>
             <div style="font-size: 12px;">💖 $<span id="dinero-mio">1000</span></div>
@@ -56,7 +57,11 @@
     let conn, miTurno = false, miPos = 0, amigoPos = 0, miDinero = 1000, bloqueado = false;
     const mapa = [{n: "SALIDA", p:0}, {n: "TÉ ($100)", p:100, owner:null}, {n: "SUERTE", p:0}, {n: "BOUTIQUE ($200)", p:200, owner:null}, {n: "POLICÍA", p:0}, {n: "CAFÉ ($150)", p:150, owner:null}, {n: "PARQUE ($120)", p:120, owner:null}, {n: "SPA ($250)", p:250, owner:null}, {n: "VILLA 1 ($300)", p:300, owner:null}, {n: "MALL ($350)", p:350, owner:null}, {n: "JOYAS ($400)", p:400, owner:null}, {n: "POLICÍA", p:0}, {n: "VILLA 3 ($220)", p:220, owner:null}, {n: "GYM ($180)", p:180, owner:null}, {n: "PRÉSTAMO", p:-200, owner:null}, {n: "VIVIENDA ($500)", p:500, owner:null}];
 
-    function log(m) { const l = document.getElementById('log'); l.innerHTML += `<div>> ${m}</div>`; l.scrollTop = l.scrollHeight; }
+    function log(m) { 
+        const l = document.getElementById('log'); 
+        l.innerHTML += `<div>> ${m}</div>`; 
+        l.scrollTop = l.scrollHeight; 
+    }
 
     function moverFichas() {
         ['p1', 'p2'].forEach((id, idx) => {
@@ -75,22 +80,26 @@
         document.getElementById('dice-val').innerText = "Dado: " + val;
         let prevPos = miPos;
         miPos = (miPos + val) % mapa.length;
+        
         if(miPos < prevPos) { miDinero += 100; log("Pasaste por SALIDA: +$100"); }
         
         let casilla = mapa[miPos];
+        log("Caíste en " + casilla.n);
+        
         if(casilla.n === "SUERTE") {
             let premio = [50, 100, 200][Math.floor(Math.random()*3)];
             miDinero += premio;
             document.getElementById('modal-text').innerText = "¡Encontraste $" + premio + "!";
             document.getElementById('modal').style.display = 'block';
+            log("Suerte: +$" + premio);
         } else if(casilla.n.includes("POLICÍA")) {
             bloqueado = true;
-            log("¡DETENIDO! Un turno sin jugar.");
+            log("¡DETENIDO! Un turno perdido.");
         }
         
         document.getElementById('dinero-mio').innerText = miDinero;
         moverFichas();
-        conn.send({type: 'MOVE', pos: miPos, lock: bloqueado});
+        if(conn) conn.send({type: 'MOVE', pos: miPos, lock: bloqueado});
         miTurno = false;
         document.getElementById('turno-text').innerText = "ESPERANDO...";
     }
@@ -100,9 +109,12 @@
         if (actual.p > 0 && actual.owner === null && miDinero >= actual.p) {
             miDinero -= actual.p;
             actual.owner = 'yo';
+            document.getElementById('cell-' + miPos).classList.add('owned');
             document.getElementById('dinero-mio').innerText = miDinero;
             log("Compraste " + actual.n);
-        } else log("No puedes comprar aquí.");
+        } else {
+            log("No se puede comprar esta casilla.");
+        }
     }
 
     function conectar() {
@@ -112,7 +124,14 @@
 
     function setupConn() {
         conn.on('data', d => {
-            if(d.type === 'MOVE') { amigoPos = d.pos; moverFichas(); miTurno = true; bloqueado = false; document.getElementById('turno-text').innerText = "¡TU TURNO!"; }
+            if(d.type === 'MOVE') { 
+                amigoPos = d.pos; 
+                moverFichas(); 
+                miTurno = true; 
+                bloqueado = false; 
+                document.getElementById('turno-text').innerText = "¡TU TURNO!"; 
+                log("Tu amigo se movió a la casilla " + d.pos);
+            }
         });
     }
 
