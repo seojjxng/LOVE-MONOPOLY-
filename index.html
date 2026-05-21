@@ -80,15 +80,17 @@
         let val = Math.floor(Math.random()*6)+1;
         miPos[miIndex] = (miPos[miIndex] + val) % 16;
         if (miPos[miIndex] === 4) miPos[miIndex] = 11;
-        let data = {type: 'MOVE', idx: miIndex, pos: miPos[miIndex], next: (miIndex + 1) % 4, miPos: miPos, turnoActual: (miIndex + 1) % 4};
+        
+        let data = {type: 'MOVE', idx: miIndex, pos: miPos[miIndex], next: (turnoActual + 1) % 4, fullPos: miPos};
+        
         procesarMovimiento(data);
         if (esHost) peerConnections.forEach(c => c.send(data));
         else conn.send(data);
     }
 
     function procesarMovimiento(d) {
-        miPos = d.miPos;
-        turnoActual = d.turnoActual;
+        miPos = d.fullPos;
+        turnoActual = d.next;
         const el = document.getElementById('p' + (d.idx + 1));
         const cell = document.getElementById('cell-' + d.pos);
         if(cell && el) { el.style.left = (cell.offsetLeft + 10) + 'px'; el.style.top = (cell.offsetTop + 10) + 'px'; }
@@ -98,14 +100,15 @@
 
     peer.on('open', id => {
         document.getElementById('my-id').innerText = "ID: " + id;
-        if (id) log("Bienvenido, " + jugadores[0]);
+        log("Has iniciado como " + jugadores[0]);
     });
 
     peer.on('connection', c => {
         esHost = true;
         peerConnections.push(c);
         let nuevoIdx = peerConnections.length;
-        c.send({type: 'INIT', idx: nuevoIdx, miPos: miPos, turnoActual: turnoActual});
+        
+        c.send({type: 'INIT', idx: nuevoIdx, players: jugadores});
         log(jugadores[nuevoIdx] + " se ha unido.");
         
         c.on('data', d => {
@@ -122,9 +125,9 @@
     function conectar() {
         esHost = false; 
         conn = peer.connect(document.getElementById('peer-id').value);
-        conn.on('open', () => log("Te has unido a la sala."));
+        conn.on('open', () => log("Te has unido. Eres " + jugadores[miIndex]));
         conn.on('data', d => {
-            if (d.type === 'INIT') { miIndex = d.idx; miPos = d.miPos; turnoActual = d.turnoActual; actualizarUI(); }
+            if (d.type === 'INIT') { miIndex = d.idx; log("Conectado como " + jugadores[miIndex]); }
             if (d.type === 'MOVE') procesarMovimiento(d);
             if (d.type === 'CHAT') mostrarChat(d.user, d.msg);
         });
