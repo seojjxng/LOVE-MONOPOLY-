@@ -135,9 +135,23 @@
         conn.on('open', () => { juegoIniciado = true; miTurno = esHost; log("Conectado."); });
         conn.on('data', d => {
             if(d.type === 'MOVE') {
+                const otraFicha = document.getElementById(esHost ? 'p2' : 'p1');
+                const cell = document.getElementById('cell-' + d.pos);
+                if(cell && otraFicha) {
+                    otraFicha.style.left = (cell.offsetLeft + (esHost ? 29 : 31)) + 'px';
+                    otraFicha.style.top = (cell.offsetTop + 30) + 'px';
+                }
                 miTurno = true; document.getElementById('turno-text').innerText = "¡TU TURNO!";
             }
-            if(d.type === 'JAIL_EVENT') { extraTurnos = 2; miTurno = true; document.getElementById('turno-text').innerText = "¡TURNO DOBLE!"; }
+            if(d.type === 'JAIL_EVENT') { 
+                const otraFicha = document.getElementById(esHost ? 'p2' : 'p1');
+                const cell = document.getElementById('cell-' + d.pos);
+                if(cell && otraFicha) {
+                    otraFicha.style.left = (cell.offsetLeft + (esHost ? 29 : 31)) + 'px';
+                    otraFicha.style.top = (cell.offsetTop + 30) + 'px';
+                }
+                extraTurnos = 2; miTurno = true; document.getElementById('turno-text').innerText = "¡TURNO DOBLE!"; 
+            }
             if(d.type === 'PAY') { miDinero += d.amount; document.getElementById('dinero-mio').innerText = miDinero; log("Recibiste $" + d.amount + " de alquiler."); }
             if(d.type === 'BUY') { mapa[d.pos].owner = d.owner; document.getElementById('cell-' + d.pos).classList.add(d.owner === 'host' ? 'owned-host' : 'owned-visitante'); log("El otro jugador compró: " + mapa[d.pos].n); }
             if(d.type === 'UPGRADE') { mapa[d.pos].up = d.up; log("El otro jugador mejoró: " + mapa[d.pos].n); }
