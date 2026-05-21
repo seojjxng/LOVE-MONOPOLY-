@@ -49,65 +49,69 @@
 <script>
     const peer = new Peer();
     let conn, miTurno = false, miPos = 0, miDinero = 1000, amigoDinero = 1000, bloqueado = false;
-    
-    // Mapa actualizado con precios incluidos
     const mapa = [
-        {n: "SALIDA", p: 0}, {n: "TÉ ($100)", p: 100}, {n: "SUERTE", p: 0}, {n: "BOUTIQUE ($200)", p: 200}, {n: "POLICÍA", p: 0}, 
-        {n: "CAFÉ ($150)", p: 150}, {n: "PARQUE ($120)", p: 120}, {n: "TÉ ($100)", p: 100}, {n: "SPA ($250)", p: 250}, {n: "VILLA 1 ($300)", p: 300},
-        {n: "MALL ($350)", p: 350}, {n: "JOYAS ($400)", p: 400}, {n: "VILLA 2 ($200)", p: 200}, {n: "POLICÍA", p: 0}, {n: "VILLA 3 ($220)", p: 220},
-        {n: "GYM ($180)", p: 180}, {n: "PRÉSTAMO", p: -200}, {n: "VIVIENDA", p: 500}
+        {n: "SALIDA", p:0}, {n: "TÉ ($100)", p:100}, {n: "SUERTE", p:0}, {n: "BOUTIQUE ($200)", p:200}, {n: "POLICÍA", p:0}, 
+        {n: "CAFÉ ($150)", p:150}, {n: "PARQUE ($120)", p:120}, {n: "TÉ ($100)", p:100}, {n: "SPA ($250)", p:250}, {n: "VILLA 1 ($300)", p:300},
+        {n: "MALL ($350)", p:350}, {n: "JOYAS ($400)", p:400}, {n: "VILLA 2 ($200)", p:200}, {n: "POLICÍA", p:0}, {n: "VILLA 3 ($220)", p:220},
+        {n: "GYM ($180)", p:180}, {n: "PRÉSTAMO", p:-200}, {n: "VIVIENDA", p:500}
     ];
 
-    function log(m) { 
+    // Función log corregida: 'esRemoto' evita el bucle
+    function log(m, esRemoto = false) { 
         const l = document.getElementById('log'); 
         l.innerHTML += `<div>> ${m}</div>`; l.scrollTop = l.scrollHeight;
-        if(conn) conn.send({type: 'LOG', msg: m});
+        if(conn && !esRemoto) conn.send({type: 'LOG', msg: m});
+    }
+
+    function syncMoney() {
+        if(conn) conn.send({type: 'MONEY_UPDATE', amount: miDinero});
     }
 
     function comprar() {
         let actual = mapa[miPos];
-        
-        if (actual.n === "PRÉSTAMO") {
-            miDinero += 200;
-            log("¡Pediste un préstamo de $200!");
-        } else if (actual.n === "VIVIENDA") {
-            if(miDinero >= 500) { miDinero -= 500; log("¡Compraste una vivienda!"); } 
-            else log("No te alcanza para la vivienda.");
-        } else if (actual.p > 0 && miDinero >= actual.p) {
-            miDinero -= actual.p;
-            log("Compraste " + actual.n);
-        } else {
-            log("Acción no válida o fondos insuficientes.");
-        }
-        
+        if (actual.n === "PRÉSTAMO") { miDinero += 200; log("¡Pediste préstamo!"); }
+        else if (actual.n === "VIVIENDA" && miDinero >= 500) { miDinero -= 500; log("¡Construiste casa!"); }
+        else if (actual.p > 0 && miDinero >= actual.p) { miDinero -= actual.p; log("Compraste " + actual.n); }
+        else return;
         document.getElementById('dinero-mio').innerText = miDinero;
-        if(conn) conn.send({type: 'MONEY_UPDATE', amount: miDinero});
+        syncMoney();
     }
 
-    // Inicialización P2P
     peer.on('open', id => document.getElementById('my-id').innerText = "Tu ID: " + id);
-    peer.on('connection', c => { conn = c; setup(); });
+    peer.on('connection', c => { conn = c; setup(); log("¡Conexión establecida!"); });
 
     function conectar() {
         conn = peer.connect(document.getElementById('peer-id').value);
         setup();
         miTurno = true;
+        log("¡Conexión establecida!");
     }
 
     function setup() {
         conn.on('data', d => {
-            if(d.type === 'MOVE') { miTurno = true; document.getElementById('turno-text').innerText = "TU TURNO"; }
-            else if(d.type === 'MONEY_UPDATE') { amigoDinero = d.amount; document.getElementById('dinero-amigo').innerText = amigoDinero; }
-            else if(d.type === 'LOG') log("Amigo: " + d.msg);
+            if(d.type === 'MOVE') {
+                miTurno = true;
+                document.getElementById('turno-text').innerText = "TU TURNO";
+                if(d.bloqueado) { bloqueado = true; log("¡Un turno sin jugar!"); }
+            } else if(d.type === 'LOG') {
+                log("Amigo: " + d.msg, true); // true para no reenviar
+            } else if(d.type === 'MONEY_UPDATE') {
+                amigoDinero = d.amount;
+                document.getElementById('dinero-amigo').innerText = amigoDinero;
+            }
         });
     }
 
     function tirarDado() {
         if(!miTurno) return;
+        if(bloqueado) { log("¡Turno perdido!"); bloqueado = false; miTurno = false; return; }
+        
         let val = Math.floor(Math.random()*6)+1;
         miPos = (miPos + val) % mapa.length;
         log("Caíste en " + mapa[miPos].n);
-        conn.send({type: 'MOVE', val: val});
+        
+        let b = (mapa[miPos].n === "POLICÍA");
+        conn.send({type: 'MOVE', val: val, bloqueado: b});
         miTurno = false;
         document.getElementById('turno-text').innerText = "ESPERANDO...";
     }
