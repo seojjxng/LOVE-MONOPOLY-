@@ -80,9 +80,7 @@
         let val = Math.floor(Math.random()*6)+1;
         miPos[miIndex] = (miPos[miIndex] + val) % 16;
         if (miPos[miIndex] === 4) miPos[miIndex] = 11;
-        
         let data = {type: 'MOVE', idx: miIndex, pos: miPos[miIndex], next: (turnoActual + 1) % 4, fullPos: miPos};
-        
         procesarMovimiento(data);
         if (esHost) peerConnections.forEach(c => c.send(data));
         else conn.send(data);
@@ -100,25 +98,22 @@
 
     peer.on('open', id => {
         document.getElementById('my-id').innerText = "ID: " + id;
-        log("Has iniciado como " + jugadores[0]);
+        log("Dog (el host) creó la sala.");
     });
 
     peer.on('connection', c => {
         esHost = true;
         peerConnections.push(c);
         let nuevoIdx = peerConnections.length;
-        
-        // Enviamos el índice específico al nuevo invitado
         c.send({type: 'INIT', idx: nuevoIdx});
-        log(jugadores[nuevoIdx] + " se ha unido.");
-        
+        log(jugadores[nuevoIdx] + " se ha unido. Bienvenido " + jugadores[nuevoIdx]);
         c.on('data', d => {
             if (d.type === 'MOVE') {
                 procesarMovimiento(d);
                 peerConnections.forEach(con => con.send(d));
             } else if (d.type === 'CHAT') {
                 mostrarChat(d.user, d.msg);
-                peerConnections.forEach(con => { if(con !== c) con.send(d); });
+                peerConnections.forEach(con => con.send(d));
             }
         });
     });
@@ -126,13 +121,11 @@
     function conectar() {
         esHost = false; 
         conn = peer.connect(document.getElementById('peer-id').value);
-        conn.on('open', () => {
-            log("Conectando al Host...");
-        });
+        conn.on('open', () => log("Conectando..."));
         conn.on('data', d => {
             if (d.type === 'INIT') { 
                 miIndex = d.idx; 
-                log("Te has unido. Eres " + jugadores[miIndex]); 
+                log("Te has unido como " + jugadores[miIndex]); 
             }
             if (d.type === 'MOVE') procesarMovimiento(d);
             if (d.type === 'CHAT') mostrarChat(d.user, d.msg);
