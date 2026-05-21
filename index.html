@@ -9,6 +9,8 @@
         .container { display: flex; gap: 25px; width: 950px; }
         .board { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(5, 100px); gap: 8px; background: #ffccd5; padding: 15px; border-radius: 25px; position: relative; }
         .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; cursor: pointer; transition: 0.3s; }
+        .owned-host { background-color: #add8e6 !important; }
+        .owned-visitante { background-color: #ffb6c1 !important; }
         .token { width: 35px; height: 35px; position: absolute; z-index: 10; transition: all 0.5s ease; pointer-events: none; }
         .center-zone { grid-column: 2 / 5; grid-row: 2 / 5; background: #fff5f7; border: 3px dashed #ff80bf; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; }
         .sidebar { width: 320px; display: flex; flex-direction: column; gap: 20px; }
@@ -45,7 +47,7 @@
 
 <script>
     const peer = new Peer();
-    let conn, miTurno = false, miPos = 0, juegoIniciado = false;
+    let conn, miTurno = false, miPos = 0, juegoIniciado = false, esHost = false;
     let miDinero = 1000;
     
     const mapa = [
@@ -58,71 +60,74 @@
     function log(m) { const l = document.getElementById('log'); l.innerHTML += `<div>> ${m}</div>`; l.scrollTop = l.scrollHeight; }
 
     function moverFichas() {
-        ['p1', 'p2'].forEach(id => {
-            const cell = document.getElementById('cell-' + miPos);
-            const el = document.getElementById(id);
-            if(cell && el) {
-                let offset = (id === 'p1') ? 31 : 29;
-                el.style.left = (cell.offsetLeft + offset) + 'px';
-                el.style.top = (cell.offsetTop + 30) + 'px';
-            }
-        });
+        const cell = document.getElementById('cell-' + miPos);
+        const el = document.getElementById(esHost ? 'p1' : 'p2');
+        if(cell && el) {
+            el.style.left = (cell.offsetLeft + (esHost ? 31 : 29)) + 'px';
+            el.style.top = (cell.offsetTop + 30) + 'px';
+        }
     }
 
     function tirarDado() {
-        if(!juegoIniciado) return log("El juego no ha empezado.");
-        if(!miTurno) return log("No es tu turno.");
+        if(!juegoIniciado || !miTurno) return;
         let val = Math.floor(Math.random()*6)+1;
-        miPos = (miPos + val) % mapa.length;
-        log("Sacaste " + val + ". Estás en " + mapa[miPos].n);
+        let nuevaPos = miPos + val;
+        
+        if (nuevaPos >= mapa.length) {
+            miDinero += 100;
+            document.getElementById('dinero-mio').innerText = miDinero;
+            log("Pasaste por SALIDA: +$100");
+        }
+        
+        miPos = nuevaPos % mapa.length;
+        
+        if (miPos === 4) {
+            log("¡A LA CÁRCEL! Vas a policía.");
+            miPos = 11;
+            miTurno = false;
+            if(conn) conn.send({type: 'MOVE', pos: miPos, extraTurn: true});
+        }
+        
         moverFichas();
+        if(conn) conn.send({type: 'MOVE', pos: miPos});
         miTurno = false;
         document.getElementById('turno-text').innerText = "ESPERANDO...";
-        if(conn) conn.send({type: 'MOVE', pos: miPos});
     }
 
     function comprar() {
-        if(!juegoIniciado) return log("Error: El juego aún no empieza.");
         let actual = mapa[miPos];
-        if(actual.p === 0) return log("Esta casilla no se puede comprar.");
-        if(actual.owner) return log("Ya tiene dueño.");
-        if(miDinero < actual.p) return log("No tienes suficiente dinero.");
-        
-        miDinero -= actual.p;
-        actual.owner = 'yo';
-        document.getElementById('dinero-mio').innerText = miDinero;
-        log("Compraste " + actual.n);
+        if(!actual.owner && actual.p > 0 && miDinero >= actual.p) {
+            miDinero -= actual.p;
+            actual.owner = esHost ? 'host' : 'visitante';
+            document.getElementById('cell-' + miPos).classList.add(esHost ? 'owned-host' : 'owned-visitante');
+            document.getElementById('dinero-mio').innerText = miDinero;
+            log("Compraste " + actual.n);
+        }
     }
 
     function conectar() {
+        esHost = true;
         conn = peer.connect(document.getElementById('peer-id').value);
         setupConn();
     }
 
     function setupConn() {
-        conn.on('open', () => {
-            log("Conexión establecida.");
-            juegoIniciado = true;
-            miTurno = true;
-            document.getElementById('turno-text').innerText = "¡TU TURNO!";
-            log("Juego iniciado. ¡Es tu turno!");
-        });
+        conn.on('open', () => { juegoIniciado = true; miTurno = esHost; log("Conectado."); });
         conn.on('data', d => {
-            if(d.type === 'MOVE') { miTurno = true; document.getElementById('turno-text').innerText = "¡TU TURNO!"; log("Tu turno."); }
+            if(d.type === 'MOVE') { miTurno = true; document.getElementById('turno-text').innerText = "¡TU TURNO!"; }
+            if(d.extraTurn) { miTurno = true; log("El otro jugador fue a la cárcel, juegas dos veces."); }
         });
     }
 
     peer.on('open', id => document.getElementById('my-id').innerText = "ID: " + id);
     peer.on('connection', c => { conn = c; setupConn(); juegoIniciado = true; });
 
-    // Init tablero
     const board = document.getElementById('board');
     mapa.forEach((m, i) => {
         const d = document.createElement('div');
         d.className = 'cell'; d.id = 'cell-' + i; d.innerHTML = m.n.replace('(', '<br>(');
         board.appendChild(d);
     });
-    window.onload = () => setTimeout(moverFichas, 500);
 </script>
 </body>
 </html>
