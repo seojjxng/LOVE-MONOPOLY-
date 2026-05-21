@@ -7,14 +7,17 @@
     <style>
         body { background: #fff0f3; font-family: 'Montserrat', sans-serif; display: flex; justify-content: center; padding: 20px; color: #c71585; }
         .container { display: flex; gap: 25px; width: 950px; }
-        .board { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(5, 100px); gap: 8px; background: #ffccd5; padding: 15px; border-radius: 25px; }
-        .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; cursor: pointer; transition: 0.3s; }
+        .board { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(5, 100px); gap: 8px; background: #ffccd5; padding: 15px; border-radius: 25px; position: relative; }
+        .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; cursor: pointer; transition: 0.3s; position: relative; }
         .center-zone { grid-column: 2 / 5; grid-row: 2 / 5; background: #fff5f7; border: 3px dashed #ff80bf; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; }
         .sidebar { width: 320px; display: flex; flex-direction: column; gap: 20px; }
         .panel { background: #fff0f9; padding: 20px; border-radius: 20px; border: 2px solid #ffccd5; }
         .btn { width: 70%; padding: 8px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin: 5px 0; font-size: 11px; }
         
         .dice { width: 60px; height: 60px; background: #ff59aa; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: bold; cursor: pointer; box-shadow: 0 5px #c71585; margin: 10px; }
+        
+        /* Estilos de las mascotas */
+        .token { width: 40px; height: 40px; position: absolute; transition: all 0.5s ease; z-index: 10; pointer-events: none; }
         
         #modal { display: none; position: fixed; top: 30%; left: 40%; width: 300px; background: #fff0f9; border: 3px solid #ff80bf; padding: 20px; border-radius: 5px; text-align: center; z-index: 100; box-shadow: 5px 5px 0 #ff80bf; }
         #log { height: 180px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; }
@@ -27,6 +30,9 @@
     <p id="modal-desc"></p>
     <button class="btn" onclick="document.getElementById('modal').style.display='none'">Aceptar</button>
 </div>
+
+<img src="https://i.imgur.com/FGnMi8Y.png" id="p1" class="token">
+<img src="https://i.imgur.com/fRZJfP8.png" id="p2" class="token">
 
 <div class="container">
     <div class="board" id="board">
@@ -52,27 +58,31 @@
 
 <script>
     const peer = new Peer();
-    let conn, miTurno = false, miPos = 0, miDinero = 1000, amigoDinero = 1000, bloqueado = false;
+    let conn, miTurno = false, miPos = 0, amigoPos = 0, miDinero = 1000, amigoDinero = 1000, bloqueado = false;
     
     const mapa = [
-        {n: "SALIDA", p:0}, {n: "TÉ ($100)", p:100, owner: null, level: 0}, {n: "SUERTE", p:0}, 
-        {n: "BOUTIQUE ($200)", p:200, owner: null, level: 0}, {n: "POLICÍA", p:0},
-        {n: "CAFÉ ($150)", p:150, owner: null, level: 0}, {n: "PARQUE ($120)", p:120, owner: null, level: 0},
-        {n: "TÉ ($100)", p:100, owner: null, level: 0}, {n: "SPA ($250)", p:250, owner: null, level: 0},
-        {n: "VILLA 1 ($300)", p:300, owner: null, level: 0}, {n: "MALL ($350)", p:350, owner: null, level: 0},
-        {n: "JOYAS ($400)", p:400, owner: null, level: 0}, {n: "VILLA 2 ($200)", p:200, owner: null, level: 0},
-        {n: "POLICÍA", p:0}, {n: "VILLA 3 ($220)", p:220, owner: null, level: 0},
-        {n: "GYM ($180)", p:180, owner: null, level: 0}, {n: "PRÉSTAMO", p:-200}, {n: "VIVIENDA", p:500}
+        {n: "SALIDA", p:0}, {n: "TÉ ($100)", p:100, owner: null}, {n: "SUERTE", p:0}, 
+        {n: "BOUTIQUE ($200)", p:200, owner: null}, {n: "POLICÍA", p:0},
+        {n: "CAFÉ ($150)", p:150, owner: null}, {n: "PARQUE ($120)", p:120, owner: null},
+        {n: "TÉ ($100)", p:100, owner: null}, {n: "SPA ($250)", p:250, owner: null},
+        {n: "VILLA 1 ($300)", p:300, owner: null}, {n: "MALL ($350)", p:350, owner: null},
+        {n: "JOYAS ($400)", p:400, owner: null}, {n: "VILLA 2 ($200)", p:200, owner: null},
+        {n: "POLICÍA", p:0}, {n: "VILLA 3 ($220)", p:220, owner: null},
+        {n: "GYM ($180)", p:180, owner: null}, {n: "PRÉSTAMO", p:-200}, {n: "VIVIENDA", p:500}
     ];
+
+    function moverFicha(id, pos) {
+        const cell = document.getElementById('cell-' + pos);
+        const rect = cell.getBoundingClientRect();
+        const t = document.getElementById(id);
+        t.style.left = (rect.left + 5) + 'px';
+        t.style.top = (rect.top + 5) + 'px';
+    }
 
     function log(m) { const l = document.getElementById('log'); l.innerHTML += `<div>> ${m}</div>`; l.scrollTop = l.scrollHeight; }
 
     function activarSuerte() {
-        const eventos = [
-            {t: "Lotería", m: "¡Ganaste la lotería!", v: 300},
-            {t: "Herencia", m: "Recibiste una herencia.", v: 500},
-            {t: "Dinero", m: "Encontraste dinero en la calle.", v: 50}
-        ];
+        const eventos = [{t: "Lotería", m: "¡Ganaste!", v: 300}, {t: "Herencia", m: "Recibiste herencia.", v: 500}];
         const res = eventos[Math.floor(Math.random() * eventos.length)];
         miDinero += res.v;
         document.getElementById('modal-title').innerText = res.t;
@@ -83,43 +93,37 @@
 
     function tirarDado() {
         if(!miTurno) return;
-        if(bloqueado) { log("¡Turno perdido (Policía)!"); bloqueado = false; miTurno = false; conn.send({type: 'MOVE', pos: miPos, lock: false}); return; }
-        
+        if(bloqueado) { bloqueado = false; conn.send({type: 'MOVE', pos: miPos, lock: false}); return; }
         let val = Math.floor(Math.random()*6)+1;
-        document.getElementById('dice-result').innerText = val;
         miPos = (miPos + val) % mapa.length;
+        moverFicha('p1', miPos);
         
         let esPolicia = (mapa[miPos].n === "POLICÍA");
-        if(esPolicia) { log("¡Caíste en POLICÍA!"); bloqueado = true; }
+        if(esPolicia) bloqueado = true;
         if(mapa[miPos].n === "SUERTE") activarSuerte();
         
-        log("Caíste en " + mapa[miPos].n);
         conn.send({type: 'MOVE', pos: miPos, lock: esPolicia});
         miTurno = false;
-        document.getElementById('turno-text').innerText = "ESPERANDO...";
-    }
-
-    function comprar() {
-        let actual = mapa[miPos];
-        if (actual.p > 0 && actual.owner === null) {
-            actual.owner = 'me';
-            miDinero -= actual.p;
-            document.getElementById('cell-' + miPos).style.background = "#ffe4e9";
-            document.getElementById('dinero-mio').innerText = miDinero;
-            log("Compraste " + actual.n);
-        }
     }
 
     peer.on('open', id => document.getElementById('my-id').innerText = id);
-    peer.on('connection', c => { conn = c; log("¡Conexión establecida!"); });
+    peer.on('connection', c => { conn = c; setup(); });
+    function conectar() { conn = peer.connect(document.getElementById('peer-id').value); setup(); miTurno = true; }
 
-    function conectar() { conn = peer.connect(document.getElementById('peer-id').value); miTurno = true; log("¡Conexión establecida!"); }
+    function setup() {
+        conn.on('data', d => {
+            if (d.type === 'MOVE') { amigoPos = d.pos; moverFicha('p2', amigoPos); miTurno = true; }
+        });
+    }
 
     mapa.forEach((m, i) => {
         const d = document.createElement('div');
         d.className = 'cell'; d.id = 'cell-' + i; d.innerText = m.n;
         document.getElementById('board').appendChild(d);
     });
+    
+    // Inicializar posición
+    setTimeout(() => { moverFicha('p1', 0); moverFicha('p2', 0); }, 500);
 </script>
 </body>
 </html>
