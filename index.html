@@ -5,8 +5,8 @@
     <title>Cute Monopoly Town P2P</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { background: #fff0f3; font-family: 'Montserrat', sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; color: #c71585; }
-        .main-wrapper { display: flex; gap: 25px; width: 950px; }
+        body { background: #fff0f3; font-family: 'Montserrat', sans-serif; display: flex; justify-content: center; padding: 20px; color: #c71585; }
+        .container { display: flex; gap: 25px; width: 950px; }
         .board { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(5, 100px); gap: 8px; background: #ffccd5; padding: 15px; border-radius: 25px; position: relative; }
         .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; cursor: pointer; }
         .token { width: 35px; height: 35px; position: absolute; z-index: 10; transition: all 0.5s ease; pointer-events: none; }
@@ -16,14 +16,13 @@
         .btn { width: 100%; padding: 10px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin: 5px 0; font-size: 12px; }
         .input-field { width: 93%; padding: 8px; margin: 5px 0; border: 1px solid #ffccd5; border-radius: 8px; }
         .dice-img { width: 60px; height: 60px; cursor: pointer; margin: 10px; }
-        #log { height: 300px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; }
-        .chat-container { width: 950px; margin-top: 20px; background: #fff0f9; padding: 20px; border-radius: 20px; border: 2px solid #ffccd5; }
-        #chat-log { height: 120px; overflow-y: auto; background: white; border: 1px solid #ffccd5; border-radius: 10px; padding: 10px; margin-bottom: 10px; font-size: 12px; }
+        #log { height: 150px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; }
+        #chat-log { height: 100px; overflow-y: auto; background: white; border: 1px solid #ffccd5; border-radius: 10px; padding: 10px; font-size: 12px; margin-bottom: 5px; }
     </style>
 </head>
 <body>
 
-<div class="main-wrapper">
+<div class="container">
     <div class="board" id="board">
         <img src="https://i.imgur.com/FGnMi8Y.png" id="p0" class="token">
         <img src="https://i.imgur.com/fRZJfP8.png" id="p1" class="token">
@@ -44,54 +43,61 @@
             <button class="btn" onclick="iniciarConexion()">Conectar</button>
             <div id="my-id" style="font-size: 11px; margin-top: 5px;">Iniciando...</div>
         </div>
+        <div class="panel">
+            <strong>Chat</strong>
+            <div id="chat-log"></div>
+            <input type="text" id="chat-input" class="input-field" placeholder="Mensaje...">
+            <button class="btn" onclick="enviarChat()">Enviar</button>
+        </div>
         <div class="panel"><strong>Historial</strong><div id="log"></div></div>
     </div>
-</div>
-
-<div class="chat-container">
-    <strong>Chat Global</strong>
-    <div id="chat-log"></div>
-    <input type="text" id="chat-input" class="input-field" placeholder="Escribe un mensaje...">
-    <button class="btn" onclick="enviarChat()">Enviar Mensaje</button>
 </div>
 
 <script>
     const peer = new Peer();
     let playerNames = ["Dog", "Horse", "Hat", "Car"];
-    let myIdx = 0, connections = [];
+    let myIdx = 0, esHost = false, connections = [];
     let miPos = [0,0,0,0], hostConn = null;
+
+    const mapa = [{n: "SALIDA"}, {n: "IGLESIA"}, {n: "?"}, {n: "BOUTIQUE"}, {n: "¡A LA CÁRCEL!"}, {n: "CHEONGDAM"}, {n: "GANGNAM"}, {n: "SEOCHO-GU"}, {n: "MAPO"}, {n: "INCHEON"}, {n: "JOYAS"}, {n: "CÁRCEL"}, {n: "VILLA 3"}, {n: "?"}, {n: "ARCA"}, {n: "BUKCHON"}];
 
     function log(m) { const l = document.getElementById('log'); l.innerHTML += `<div>> ${m}</div>`; l.scrollTop = l.scrollHeight; }
     function chatLog(u, m) { const l = document.getElementById('chat-log'); l.innerHTML += `<div><b>${u}:</b> ${m}</div>`; l.scrollTop = l.scrollHeight; }
 
-    peer.on('open', id => { document.getElementById('my-id').innerText = "ID: " + id; });
+    peer.on('open', id => { document.getElementById('my-id').innerText = "ID: " + id; esHost = true; });
+
+    function iniciarConexion() {
+        let conn = peer.connect(document.getElementById('peer-id').value);
+        hostConn = conn;
+        esHost = false; 
+        setupConn(conn);
+    }
 
     peer.on('connection', conn => {
         let newIdx = connections.length + 1;
+        if(newIdx > 3) return;
         connections.push(conn);
         conn.send({type: 'WELCOME', idx: newIdx});
         setupConn(conn);
-        log(playerNames[newIdx] + " se ha conectado.");
+        notifyAll({type: 'LOG', msg: playerNames[newIdx] + " se ha unido a la sala"});
     });
-
-    function iniciarConexion() {
-        hostConn = peer.connect(document.getElementById('peer-id').value);
-        setupConn(hostConn);
-    }
 
     function setupConn(conn) {
         conn.on('data', d => {
             if (d.type === 'WELCOME') { myIdx = d.idx; log("Te has unido como " + playerNames[myIdx]); }
-            if (d.type === 'MOVE') { miPos[d.idx] = d.pos; actualizarFichas(); }
-            if (d.type === 'CHAT') chatLog(d.user, d.msg);
-            if (d.type === 'SYNC') { miPos = d.pos; actualizarFichas(); }
+            if (d.type === 'MOVE') { miPos[d.idx] = d.pos; actualizarFichas(); if(esHost) broadcast(d); }
+            if (d.type === 'CHAT') { chatLog(d.user, d.msg); if(esHost) broadcast(d); }
+            if (d.type === 'LOG') { log(d.msg); if(esHost) broadcast(d); }
         });
     }
 
+    function broadcast(d) { connections.forEach(c => c.send(d)); }
+    function notifyAll(d) { log(d.msg); broadcast(d); }
+
     function actualizarFichas() {
-        miPos.forEach((pos, i) => {
+        miPos.forEach((p, i) => {
             const el = document.getElementById('p' + i);
-            const cell = document.getElementById('cell-' + pos);
+            const cell = document.getElementById('cell-' + p);
             if(cell && el) { el.style.left = (cell.offsetLeft + 10) + 'px'; el.style.top = (cell.offsetTop + 10) + 'px'; }
         });
     }
@@ -100,21 +106,18 @@
         miPos[myIdx] = (miPos[myIdx] + Math.floor(Math.random()*6)+1) % 16;
         actualizarFichas();
         let d = {type: 'MOVE', idx: myIdx, pos: miPos[myIdx]};
-        if(hostConn) hostConn.send(d);
-        connections.forEach(c => c.send(d));
+        if(esHost) broadcast(d); else hostConn.send(d);
     }
 
     function enviarChat() {
-        let input = document.getElementById('chat-input');
-        let d = {type: 'CHAT', user: playerNames[myIdx], msg: input.value};
-        chatLog(playerNames[myIdx], input.value);
-        if(hostConn) hostConn.send(d);
-        connections.forEach(c => c.send(d));
-        input.value = "";
+        let msg = document.getElementById('chat-input').value;
+        let d = {type: 'CHAT', user: playerNames[myIdx], msg: msg};
+        chatLog(playerNames[myIdx], msg);
+        if(esHost) broadcast(d); else hostConn.send(d);
+        document.getElementById('chat-input').value = "";
     }
 
     const board = document.getElementById('board');
-    const mapa = [{n:"SALIDA"},{n:"IGLESIA"},{n:"?"},{n:"BOUTIQUE"},{n:"¡CÁRCEL!"},{n:"CHEONGDAM"},{n:"GANGNAM"},{n:"SEOCHO"},{n:"MAPO"},{n:"INCHEON"},{n:"JOYAS"},{n:"CÁRCEL"},{n:"VILLA 3"},{n:"?"},{n:"ARCA"},{n:"BUKCHON"}];
     mapa.forEach((m, i) => {
         const d = document.createElement('div');
         d.className = 'cell'; d.id = 'cell-' + i; d.innerHTML = m.n;
