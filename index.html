@@ -14,13 +14,20 @@
         .panel { background: #fff0f9; padding: 20px; border-radius: 20px; border: 2px solid #ffccd5; }
         .btn { width: 70%; padding: 8px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin: 5px 0; font-size: 11px; }
         
-        .dice { width: 60px; height: 60px; background: #ff59aa; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: bold; cursor: pointer; box-shadow: 0 5px #c71585; margin: 10px; transition: transform 0.2s; }
-        .dice:active { transform: translateY(4px); box-shadow: 0 1px #c71585; }
-
+        .dice { width: 60px; height: 60px; background: #ff59aa; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: bold; cursor: pointer; box-shadow: 0 5px #c71585; margin: 10px; }
+        
+        /* Modal Windows Rosa */
+        #modal { display: none; position: fixed; top: 30%; left: 40%; width: 300px; background: #fff0f9; border: 3px solid #ff80bf; padding: 20px; border-radius: 5px; text-align: center; z-index: 100; box-shadow: 5px 5px 0 #ff80bf; }
         #log { height: 180px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; }
     </style>
 </head>
 <body>
+
+<div id="modal">
+    <h3 id="modal-title" style="color: #c71585;">¡Tarjetita de Suerte!</h3>
+    <p id="modal-desc"></p>
+    <button class="btn" onclick="document.getElementById('modal').style.display='none'">Aceptar</button>
+</div>
 
 <div class="container">
     <div class="board" id="board">
@@ -50,13 +57,30 @@
 
     function log(m) { const l = document.getElementById('log'); l.innerHTML += `<div>> ${m}</div>`; l.scrollTop = l.scrollHeight; }
 
-    function actualizarTurnoUI() {
-        document.getElementById('turno-text').innerText = miTurno ? "¡ES TU TURNO!" : "ESPERANDO...";
+    function activarSuerte() {
+        const eventos = [
+            {t: "Lotería", m: "¡Ganaste la lotería local!", v: 300},
+            {t: "Herencia", m: "Recibiste una herencia lejana.", v: 500},
+            {t: "Calle", m: "Encontraste dinero en la calle.", v: 50},
+            {t: "Reembolso", m: "El banco te hizo un reembolso.", v: 150}
+        ];
+        const res = eventos[Math.floor(Math.random() * eventos.length)];
+        miDinero += res.v;
+        document.getElementById('modal-title').innerText = res.t;
+        document.getElementById('modal-desc').innerText = res.m + " (+$" + res.v + ")";
+        document.getElementById('modal').style.display = 'block';
+        document.getElementById('dinero-mio').innerText = miDinero;
+        log("Suerte: " + res.t + " (+$" + res.v + ")");
+    }
+
+    function comprar() {
+        if(mapa[miPos].n === "SUERTE") { activarSuerte(); return; }
+        // ... resto de la lógica de compra ...
     }
 
     function tirarDado() {
         if(!miTurno) return;
-        if(bloqueado) { log("¡Turno perdido!"); bloqueado = false; miTurno = false; conn.send({type: 'MOVE', pos: miPos, lock: false}); actualizarTurnoUI(); return; }
+        if(bloqueado) { log("¡Turno perdido en POLICÍA!"); bloqueado = false; miTurno = false; conn.send({type: 'MOVE', pos: miPos, lock: false}); actualizarTurnoUI(); return; }
         
         let val = Math.floor(Math.random()*6)+1;
         document.getElementById('dice-result').innerText = val;
@@ -74,17 +98,12 @@
         log("Le toca a tu amorcito!");
     }
 
+    function actualizarTurnoUI() { document.getElementById('turno-text').innerText = miTurno ? "¡ES TU TURNO!" : "ESPERANDO..."; }
+
     peer.on('open', id => document.getElementById('my-id').innerText = id);
     peer.on('connection', c => { conn = c; setup(); log("¡Conexión establecida!"); });
     
-    function conectar() { 
-        conn = peer.connect(document.getElementById('peer-id').value); 
-        setup(); 
-        miTurno = Math.random() > 0.5; // El que conecta decide al azar
-        conn.send({type: 'START', turno: !miTurno}); // Avisa al otro
-        actualizarTurnoUI();
-        log("¡Conexión establecida!");
-    }
+    function conectar() { conn = peer.connect(document.getElementById('peer-id').value); setup(); miTurno = Math.random() > 0.5; conn.send({type: 'START', turno: !miTurno}); actualizarTurnoUI(); log("¡Conexión establecida!"); }
 
     function setup() {
         conn.on('data', d => {
