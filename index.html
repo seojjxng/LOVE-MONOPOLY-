@@ -58,25 +58,28 @@
 <script>
     const peer = new Peer();
     let conn, esHost = false;
-    let peerConnections = []; // Lista de conexiones (solo Host)
-    let miIndex = 0; // 0, 1, 2, 3
+    let peerConnections = [];
+    let miIndex = 0;
     let turnoActual = 0; 
     let miPos = [0,0,0,0];
     let jugadores = ["Dog", "Caballo", "Hat", "Car"];
+
+    const mapa = [
+        {n: "SALIDA", p:0}, {n: "IGLESIA", p:100}, {n: "?", p:0}, {n: "BOUTIQUE", p:200}, 
+        {n: "¡A LA CÁRCEL!", p:0}, {n: "CHEONGDAM", p:500}, {n: "GANGNAM", p:520}, {n: "SEOCHO-GU", p:250}, 
+        {n: "MAPO", p:300}, {n: "INCHEON", p:350}, {n: "JOYAS", p:400}, {n: "CÁRCEL", p:0}, 
+        {n: "VILLA 3", p:220}, {n: "?", p:0}, {n: "ARCA", p:0}, {n: "BUKCHON", p:500}
+    ];
 
     function log(m) { const l = document.getElementById('log'); l.innerHTML += `<div>> ${m}</div>`; l.scrollTop = l.scrollHeight; }
     function mostrarChat(user, msg) { document.getElementById('chat-messages').innerHTML += `<div><b>${user}:</b> ${msg}</div>`; }
     function actualizarUI() { document.getElementById('turno-text').innerText = "Turno de: " + jugadores[turnoActual]; }
 
-    // --- LÓGICA DE JUEGO ---
     function tirarDado() {
         if (turnoActual !== miIndex) return log("No es tu turno.");
         let val = Math.floor(Math.random()*6)+1;
         miPos[miIndex] = (miPos[miIndex] + val) % 16;
-        
-        // Regla cárcel
         if (miPos[miIndex] === 4) miPos[miIndex] = 11;
-
         let data = {type: 'MOVE', idx: miIndex, pos: miPos[miIndex], next: (miIndex + 1) % 4};
         procesarMovimiento(data);
         if (esHost) peerConnections.forEach(c => c.send(data));
@@ -89,23 +92,20 @@
         const el = document.getElementById('p' + (d.idx + 1));
         const cell = document.getElementById('cell-' + d.pos);
         if(cell && el) { el.style.left = (cell.offsetLeft + 10) + 'px'; el.style.top = (cell.offsetTop + 10) + 'px'; }
-        log(jugadores[d.idx] + " se movió a " + d.pos);
+        log(jugadores[d.idx] + " se movió a " + mapa[d.pos].n);
         actualizarUI();
     }
 
-    // --- CONEXIONES ---
     peer.on('open', id => document.getElementById('my-id').innerText = "ID: " + id);
-    
     peer.on('connection', c => {
         esHost = true;
         peerConnections.push(c);
         let nuevoIdx = peerConnections.length;
-        c.send({type: 'INIT', idx: nuevoIdx}); // Asigna ID al invitado
+        c.send({type: 'INIT', idx: nuevoIdx});
         c.on('data', d => {
             if (d.type === 'MOVE' || d.type === 'CHAT') {
                 if (d.type === 'MOVE') procesarMovimiento(d);
                 else mostrarChat(d.user, d.msg);
-                // Reenviar a todos
                 peerConnections.forEach(con => con.send(d));
             }
         });
@@ -129,15 +129,14 @@
         document.getElementById('chat-input').value = "";
     }
 
-    // Dibujar tablero
     const board = document.getElementById('board');
-    for(let i=0; i<16; i++) {
+    mapa.forEach((m, i) => {
         const d = document.createElement('div');
-        d.className = 'cell'; d.id = 'cell-' + i; d.innerHTML = i;
+        d.className = 'cell'; d.id = 'cell-' + i; d.innerHTML = `${m.n}<br>${m.p > 0 ? '$'+m.p : ''}`;
         board.appendChild(d);
-    }
+    });
     
-    function comprar() { if(turnoActual === miIndex) log("Compraste propiedad."); }
+    function comprar() { if(turnoActual === miIndex) log("Compraste " + mapa[miPos[miIndex]].n); }
     function mejorar() { if(turnoActual === miIndex) log("Mejoraste propiedad."); }
 </script>
 </body>
