@@ -2,51 +2,50 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Cute Monopoly Adventure - P2P</title>
+    <title>Cute Monopoly Adventure</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        /* Tus estilos originales se mantienen aquí */
-        body { margin: 0; padding: 15px; background: #fff0f3; font-family: 'Montserrat', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-        .arcade-container { position: relative; width: 100%; max-width: 1020px; }
-        .board-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; background: #fff; padding: 10px; border-radius: 16px; }
-        .b-cell { background: white; border: 2px solid #ffccd5; padding: 10px; text-align: center; font-size: 10px; }
-        .id-display { background: #ffe6f2; padding: 10px; font-family: monospace; border: 1px solid #ffccd5; }
+        body { background: #fff0f3; font-family: sans-serif; display: flex; justify-content: center; padding: 20px; }
+        .arcade-container { width: 100%; max-width: 600px; background: white; padding: 20px; border-radius: 20px; border: 4px solid #ffb3d9; }
+        .board-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 20px; }
+        .b-cell { background: #fffafb; border: 2px solid #ffccd5; padding: 10px; text-align: center; }
+        .id-display { background: #ffe6f2; padding: 10px; font-weight: bold; color: #ff0084; }
     </style>
 </head>
 <body>
 
 <div class="arcade-container">
     <h3>CUTE MONOPOLY P2P</h3>
-    <div id="host-section">
-        <p>Tu ID (Pásalo a tu amigo):</p>
-        <div class="id-display" id="my-peer-id">Generando...</div>
+    
+    <!-- Sección Host -->
+    <div id="host-zone">
+        <p>Tu ID de Host:</p>
+        <div class="id-display" id="my-peer-id">Esperando...</div>
     </div>
-    <div id="guest-section">
-        <input type="text" id="rival-peer-id" placeholder="ID de tu amigo aquí">
-        <button onclick="conectar()">💎 Conectar</button>
+
+    <!-- Sección Invitado -->
+    <div style="margin-top:20px;">
+        <input type="text" id="rival-peer-id" placeholder="ID del Host aquí">
+        <button onclick="conectar()">💎 Conectar como Invitado</button>
     </div>
-    <div id="event-log">Estado: Esperando...</div>
+
+    <div id="event-log" style="margin-top:10px; font-weight:bold;">Estado: Iniciando...</div>
     <div class="board-grid" id="board-mesh"></div>
 </div>
 
 <script>
-    // 1. Inicialización con ID personalizado
-    const peer = new Peer('lovingnaeun202026', {
-        host: '0.peerjs.com',
-        port: 443,
-        secure: true
-    });
-
+    // LÓGICA: Solo asignamos ID fijo si es el primer jugador.
+    // Para simplificar, dejaremos que PeerJS asigne IDs aleatorios a ambos.
+    // Es la forma más segura de que no se rompa el código.
+    const peer = new Peer(); 
     let conn;
 
-    // 2. Mostrar ID y construir tablero al cargar
     peer.on('open', (id) => {
         document.getElementById('my-peer-id').innerText = id;
-        document.getElementById('event-log').innerText = "✅ Listo para jugar";
+        document.getElementById('event-log').innerText = "✅ Listo. Comparte este ID.";
         buildBoard();
     });
 
-    // 3. Gestión de conexión
     peer.on('connection', (c) => {
         conn = c;
         setupConnection();
@@ -61,19 +60,17 @@
 
     function setupConnection() {
         conn.on('open', () => {
-            document.getElementById('event-log').innerText = "💎 ¡Conexión establecida!";
+            document.getElementById('event-log').innerText = "💎 ¡CONEXIÓN ESTABLECIDA!";
         });
-        conn.on('data', (data) => { alert("Recibiste: " + data); });
+        conn.on('data', (data) => { alert("Recibido: " + data); });
     }
 
-    // 4. Función para recuperar tu tablero
     function buildBoard() {
         const boardMesh = document.getElementById('board-mesh');
-        boardMesh.innerHTML = ''; 
         for(let i=0; i<16; i++) {
             const div = document.createElement('div');
             div.className = 'b-cell';
-            div.innerText = `VILLA ${i + 1}`;
+            div.innerText = `Villa ${i + 1}`;
             boardMesh.appendChild(div);
         }
     }
