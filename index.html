@@ -78,7 +78,7 @@
     let miIdx = -1, sala = "";
     const nombres = ["Dog", "Horse", "Hat", "Car"];
     const colores = ["#ffccd5", "#dcd0ff", "#c1e1c1", "#fff9c4"];
-    const mapa = [{n:"SALIDA",p:0},{n:"IGLESIA",p:100},{n:"?",p:0},{n:"BOUTIQUE",p:200},{n:"A LA CÁRCEL",p:0},{n:"CHEONGDAM",p:500},{n:"GANGNAM",p:520},{n:"SEOCHO-GU",p:250},{n:"MAPO",p:300},{n:"INCHEON",p:350},{n:"JOYAS",p:400},{n:"CÁRCEL",p:0},{n:"VILLA 3",p:220},{n:"?",p:0},{n:"ARCA",p:0},{n:"BUKCHON",p:500}];
+    const mapa = [{n:"SALIDA",p:0},{n:"IGLESIA",p:100},{n:"?",p:0},{n:"BOUTIQUE",p:200},{n:"A LA CÁRCEL",p:0},{n:"CHEONGDAM",p:500},{n:"GANGNAM",p:520},{n:"SEOCHO-GU",p:250},{n:"MAPO",p:300},{n:"INCHEON",p:350},{n:"JOYAS",p:400},{n:"CÁRCEL",p:0},{n:"VILLA 3",p:0},{n:"?",p:0},{n:"ARCA",p:0},{n:"BUKCHON",p:500}];
     const eventos = [{txt:"¡Ganaste la lotería!", m:200, g:true}, {txt:"¡Heredaste una fortuna!", m:300, g:true}, {txt:"Debes impuestos sobre la renta", m:150, g:false}, {txt:"Le debes al banco", m:250, g:false}];
 
     function log(txt) { document.getElementById('log').innerHTML += `<div>${txt}</div>`; }
@@ -112,15 +112,15 @@
             if(nuevaPos >= mapa.length) { 
                 db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => (d || 0) + 100);
                 log("Pasaste por SALIDA: +$100");
+                nuevaPos = nuevaPos % mapa.length;
             }
             
-            let pos = nuevaPos % mapa.length;
-            if(pos === 4) { 
+            if(nuevaPos === 4) { 
                 db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: 11, enCarcel: true }); 
                 log(nombres[miIdx] + " fue arrestado.");
             } else { 
-                db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: pos }); 
-                verificarCasilla(pos, j.dinero);
+                db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: nuevaPos }); 
+                verificarCasilla(nuevaPos, j.dinero);
             }
             db.ref('salas/' + sala + '/turno').set((s.turno + 1) % s.jugadores.length);
         });
@@ -149,6 +149,19 @@
     function verificarCasilla(pos, dinero) {
         let div = document.getElementById('acciones'); div.innerHTML = "";
         let propRef = db.ref('salas/' + sala + '/propiedades/' + pos);
+        
+        if(pos === 12) {
+            let impuestos = ["Prendas", "Agua", "Luz"];
+            let tipo = impuestos[Math.floor(Math.random()*impuestos.length)];
+            let monto = Math.floor(Math.random()*101) + 50;
+            db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => (d || 0) - monto);
+            document.getElementById('modal-title').innerText = "Impuesto: " + tipo;
+            document.getElementById('modal-text').innerText = "Debes pagar por " + tipo + ": $" + monto;
+            document.getElementById('modal').style.display = 'block';
+            log("Impuesto de " + tipo + ": -$ " + monto);
+            return;
+        }
+
         propRef.once('value', s => {
             let prop = s.val();
             if(!prop && mapa[pos].p > 0) {
