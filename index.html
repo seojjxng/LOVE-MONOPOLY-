@@ -81,6 +81,14 @@
         
         miPos = nuevaPos % mapa.length;
         
+        // Lógica de SUERTE/COMUNIDAD
+        if (mapa[miPos].n === "SUERTE" || mapa[miPos].n === "COMUNIDAD") {
+            let azar = Math.floor(Math.random() * 200) - 100;
+            miDinero += azar;
+            document.getElementById('dinero-mio').innerText = miDinero;
+            log("Casilla " + mapa[miPos].n + ": " + (azar > 0 ? "+" : "") + azar + "$");
+        }
+
         if (miPos === 4) {
             log("¡A LA CÁRCEL! Vas a policía.");
             miPos = 11;
@@ -102,6 +110,8 @@
             document.getElementById('cell-' + miPos).classList.add(esHost ? 'owned-host' : 'owned-visitante');
             document.getElementById('dinero-mio').innerText = miDinero;
             log("Compraste " + actual.n);
+        } else if (actual.p > 0 && actual.owner) {
+            log("Ya tiene dueño.");
         }
     }
 
@@ -114,7 +124,10 @@
     function setupConn() {
         conn.on('open', () => { juegoIniciado = true; miTurno = esHost; log("Conectado."); });
         conn.on('data', d => {
-            if(d.type === 'MOVE') { miTurno = true; document.getElementById('turno-text').innerText = "¡TU TURNO!"; }
+            if(d.type === 'MOVE') { 
+                miPos = d.pos; moverFichas(); 
+                miTurno = true; document.getElementById('turno-text').innerText = "¡TU TURNO!"; 
+            }
             if(d.extraTurn) { miTurno = true; log("El otro jugador fue a la cárcel, juegas dos veces."); }
         });
     }
