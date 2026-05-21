@@ -72,11 +72,25 @@
     function tirarDado() {
         if(!juegoIniciado || !miTurno) return;
         let val = Math.floor(Math.random()*6)+1;
-        miPos = (miPos + val) % mapa.length;
+        let nuevaPos = miPos + val;
         
+        // Verificar si pasaste por SALIDA (0)
+        if (nuevaPos >= mapa.length) {
+            miDinero += 100;
+            log("Pasaste por SALIDA: +$100");
+        }
+        
+        miPos = nuevaPos % mapa.length;
         let actual = mapa[miPos];
-        // Alquiler
-        if (actual.owner && actual.owner !== (esHost ? 'host' : 'visitante')) {
+
+        // 1. Lógica de Bonificaciones (Suerte/Comunidad)
+        if (actual.n === "SUERTE" || actual.n === "COMUNIDAD") {
+            let azar = Math.floor(Math.random() * 200) - 100;
+            miDinero += azar;
+            log("Casilla " + actual.n + ": " + (azar >= 0 ? "+" : "") + azar + "$");
+        } 
+        // 2. Lógica de Alquiler
+        else if (actual.owner && actual.owner !== (esHost ? 'host' : 'visitante')) {
             let mult = actual.up === 0 ? 0.1 : (actual.up === 1 ? 0.15 : 0.25);
             let alquiler = Math.floor(actual.p * mult);
             miDinero -= alquiler;
