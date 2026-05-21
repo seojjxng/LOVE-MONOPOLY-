@@ -64,11 +64,27 @@
         {n: "PARQUE ($120)", p:120, owner:null, renta: 25, nivel: 0}, {n: "SPA ($250)", p:250, owner:null, renta: 50, nivel: 0}, 
         {n: "VILLA 1 ($300)", p:300, owner:null, renta: 60, nivel: 0}, {n: "MALL ($350)", p:350, owner:null, renta: 70, nivel: 0}, 
         {n: "JOYAS ($400)", p:400, owner:null, renta: 80, nivel: 0}, {n: "POLICÍA", p:0}, 
-        {n: "VILLA 3 ($220)", p:220, owner:null, renta: 45, nivel: 0}, {n: "GYM ($180)", p:180, owner:null, renta: 35, nivel: 0}, 
+        {n: "VILLA 3 ($220)", p:220, owner:null, renta: 45, nivel: 0}, {n: "SUERTE", p:0}, 
         {n: "COMUNIDAD", p:0}, {n: "VIVIENDA ($500)", p:500, owner:null, renta: 100, nivel: 0}
     ];
 
     function log(m) { const l = document.getElementById('log'); l.innerHTML += `<div>> ${m}</div>`; l.scrollTop = l.scrollHeight; }
+
+    function ejecutarSuerte() {
+        const eventos = [
+            {t: "Lotería", m: "¡Ganaste $200 en la lotería!", v: 200},
+            {t: "Encontraste dinero", m: "Encontraste $150 en la calle", v: 150},
+            {t: "Herencia", m: "Un pariente te heredó $400", v: 400},
+            {t: "Deuda", m: "Debes pagar $200 al banco", v: -200}
+        ];
+        const e = eventos[Math.floor(Math.random() * eventos.length)];
+        miDinero += e.v;
+        document.getElementById('dinero-mio').innerText = miDinero;
+        document.getElementById('modal-title').innerText = e.t;
+        document.getElementById('modal-text').innerText = e.m;
+        document.getElementById('modal').style.display = 'block';
+        log(e.m);
+    }
 
     function moverFichas() {
         ['p1', 'p2'].forEach((id) => {
@@ -92,11 +108,13 @@
         let casilla = mapa[miPos];
         let proximoBloqueado = false;
         
-        if (casilla.owner === 'amigo') {
+        if (casilla.n === "SUERTE") {
+            ejecutarSuerte();
+        } else if (casilla.owner === 'amigo') {
             let mult = (casilla.nivel === 0) ? 0.15 : (casilla.nivel === 1 ? 0.25 : 0.50);
             let pago = Math.floor(casilla.p * mult);
             miDinero -= pago;
-            log("Pagaste $" + pago + " de alquiler a tu amigo.");
+            log("Pagaste $" + pago + " de alquiler.");
             if(conn) conn.send({type: 'RENT', amount: pago});
         } else if (casilla.n === "¡A LA CÁRCEL!") {
             miPos = 11; enviadaACarcel = true; proximoBloqueado = true;
@@ -123,7 +141,7 @@
                 if(conn) conn.send({type: 'BUY', pos: miPos});
             } else if (actual.owner === 'yo' && actual.nivel < 2 && miDinero >= (actual.p * 0.5)) {
                 miDinero -= (actual.p * 0.5); actual.nivel++;
-                log("Mejoraste " + actual.n + " a nivel " + actual.nivel);
+                log("Mejoraste " + actual.n);
                 if(conn) conn.send({type: 'UPGRADE', pos: miPos});
             }
             document.getElementById('dinero-mio').innerText = miDinero;
