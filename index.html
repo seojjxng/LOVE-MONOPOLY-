@@ -62,7 +62,7 @@
     let miIndex = 0;
     let turnoActual = 0; 
     let miPos = [0,0,0,0];
-    let jugadores = ["Dog", "Caballo", "Hat", "Car"];
+    let jugadores = ["Dog", "Horse", "Hat", "Car"];
 
     const mapa = [
         {n: "SALIDA", p:0}, {n: "IGLESIA", p:100}, {n: "?", p:0}, {n: "BOUTIQUE", p:200}, 
@@ -96,12 +96,19 @@
         actualizarUI();
     }
 
-    peer.on('open', id => document.getElementById('my-id').innerText = "ID: " + id);
+    peer.on('open', id => {
+        document.getElementById('my-id').innerText = "ID: " + id;
+        if (!esHost) log("Dog (el host) creó la sala.");
+    });
+
     peer.on('connection', c => {
         esHost = true;
         peerConnections.push(c);
         let nuevoIdx = peerConnections.length;
-        c.send({type: 'INIT', idx: nuevoIdx});
+        let nombre = jugadores[nuevoIdx];
+        
+        c.send({type: 'INIT', idx: nuevoIdx, names: jugadores});
+        
         c.on('data', d => {
             if (d.type === 'MOVE' || d.type === 'CHAT') {
                 if (d.type === 'MOVE') procesarMovimiento(d);
@@ -109,14 +116,19 @@
                 peerConnections.forEach(con => con.send(d));
             }
         });
+        
+        let msg = nombre + " se ha unido a la sala.";
+        log(msg);
+        peerConnections.forEach(con => con.send({type: 'JOIN', msg: msg}));
     });
 
     function conectar() {
         conn = peer.connect(document.getElementById('peer-id').value);
         conn.on('data', d => {
-            if (d.type === 'INIT') miIndex = d.idx;
+            if (d.type === 'INIT') { miIndex = d.idx; jugadores = d.names; }
             if (d.type === 'MOVE') procesarMovimiento(d);
             if (d.type === 'CHAT') mostrarChat(d.user, d.msg);
+            if (d.type === 'JOIN') log(d.msg);
         });
     }
 
