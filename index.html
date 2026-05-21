@@ -69,7 +69,6 @@
             if(miIdx > 3) return;
             db.ref('salas/' + sala + '/jugadores/' + miIdx).set({ pos: 0, dinero: 1000, activo: true });
             if(miIdx == 0) db.ref('salas/' + sala + '/turno').set(0);
-            document.getElementById('p' + miIdx).style.display = 'block';
             log(nombres[miIdx] + " entró a la sala.");
             sincronizar();
         });
@@ -103,11 +102,14 @@
         } else {
             db.ref('salas/' + sala + '/propiedades/' + pos).once('value', s => {
                 if(!s.exists() && mapa[pos].p > 0) div.innerHTML = `<button class="btn" onclick="comprar(${pos})">Comprar $${mapa[pos].p}</button>`;
-                else if(s.exists() && s.val().owner != miIdx) {
-                    let rent = Math.floor(mapa[pos].p * 0.1);
-                    db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d - rent);
-                    db.ref('salas/' + sala + '/jugadores/' + s.val().owner + '/dinero').transaction(d => d + rent);
-                    log("Alquiler: " + nombres[miIdx] + " pagó $" + rent + " a " + nombres[s.val().owner]);
+                else if(s.exists()) {
+                    if(s.val().owner == miIdx && s.val().nivel < 3) div.innerHTML = `<button class="btn" onclick="mejorar(${pos})">Mejorar $50</button>`;
+                    else if(s.val().owner != miIdx) {
+                        let rent = Math.floor(mapa[pos].p * (s.val().nivel === 1 ? 0.1 : s.val().nivel === 2 ? 0.15 : 0.25));
+                        db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d - rent);
+                        db.ref('salas/' + sala + '/jugadores/' + s.val().owner + '/dinero').transaction(d => d + rent);
+                        log("Alquiler: " + nombres[miIdx] + " pagó $" + rent + " a " + nombres[s.val().owner]);
+                    }
                 }
             });
         }
@@ -119,18 +121,24 @@
         log(nombres[miIdx] + " compró " + mapa[pos].n);
     }
 
+    function mejorar(pos) {
+        db.ref('salas/' + sala + '/propiedades/' + pos + '/nivel').transaction(n => n + 1);
+        db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d - 50);
+        log(nombres[miIdx] + " mejoró su propiedad.");
+    }
+
     function sincronizar() {
         db.ref('salas/' + sala).on('value', snap => {
             let s = snap.val();
             if(!s || !s.jugadores) return;
             document.getElementById('dinero-mio').innerText = s.jugadores[miIdx].dinero;
             document.getElementById('turno-text').innerText = (s.turno == miIdx) ? "¡ES TU TURNO!" : "Esperando a " + (nombres[s.turno] || "Jugador");
-            
             s.jugadores.forEach((j, i) => {
                 let el = document.getElementById('p' + i);
+                el.style.display = 'block';
                 if(el && j.pos !== undefined) {
                     let cell = document.getElementById('cell-' + j.pos);
-                    if(cell) { el.style.left = (cell.offsetLeft + 30) + 'px'; el.style.top = (cell.offsetTop + 30) + 'px'; }
+                    if(cell) { el.style.left = (cell.offsetLeft + 20 + (i*5)) + 'px'; el.style.top = (cell.offsetTop + 20) + 'px'; }
                 }
             });
             if(s.propiedades) {
