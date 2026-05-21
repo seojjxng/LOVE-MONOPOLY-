@@ -2,92 +2,109 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Cute Monopoly Town P2P</title>
+    <title>Cute Monopoly P2P</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { background: #fff0f3; font-family: sans-serif; display: flex; justify-content: center; padding: 20px; }
-        .arcade-container { width: 100%; max-width: 900px; background: white; padding: 20px; border-radius: 40px; border: 8px solid #ffb3d9; }
-        .board-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
-        .b-cell { height: 80px; border: 2px solid #ffccd5; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #ff59aa; text-align: center; }
-        .b-cell.center-zone { grid-column: 2 / 5; grid-row: 2 / 5; border: 3px dashed #ff80bf; }
-        .sidebar { margin-top: 20px; padding: 15px; background: #fff5f7; border-radius: 15px; }
-        .btn { padding: 10px; background: #ff59aa; color: white; border: none; border-radius: 8px; cursor: pointer; }
+        body { background: #fff0f3; font-family: 'Montserrat', sans-serif; display: flex; justify-content: center; padding: 20px; }
+        .container { display: flex; gap: 20px; width: 900px; }
+        /* Tablero de 18 casillas */
+        .board { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(5, 100px); gap: 5px; background: #ffccd5; padding: 10px; border-radius: 20px; }
+        .cell { background: white; border: 2px solid #ffccd5; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #ff59aa; text-align: center; }
+        .center-zone { grid-column: 2 / 5; grid-row: 2 / 5; background: #fff5f7; border: 3px dashed #ff80bf; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        /* Sidebar */
+        .sidebar { width: 300px; display: flex; flex-direction: column; gap: 10px; }
+        .panel { background: white; padding: 15px; border-radius: 15px; border: 2px solid #ffccd5; }
+        #log { height: 200px; overflow-y: auto; font-size: 11px; color: #555; border: 1px solid #eee; padding: 5px; }
+        .btn { width: 100%; padding: 10px; background: #ff59aa; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 5px; }
     </style>
 </head>
 <body>
 
-<div class="arcade-container">
-    <div class="board-grid" id="board-mesh"></div>
+<div class="container">
+    <div class="board" id="board">
+        <div class="center-zone">
+            <div id="turno-text" style="font-size:12px; font-weight:bold;">ESPERANDO...</div>
+            <div onclick="tirarDado()" style="font-size: 40px; cursor: pointer;">🎲</div>
+            <button class="btn" onclick="comprar()">COMPRAR</button>
+        </div>
+    </div>
+
     <div class="sidebar">
-        <div><strong>ID:</strong> <span id="my-peer-id">Conectando...</span></div>
-        <input type="text" id="rival-id" placeholder="ID amigo">
-        <button class="btn" onclick="conectar()">Conectar</button>
-        <div id="status">Esperando...</div>
-        <div>💰 Dinero: <span id="dinero">1000</span> | <button onclick="comprar()">Comprar</button></div>
+        <div class="panel">
+            <strong>Conexión</strong><br>
+            <input type="text" id="peer-id" placeholder="ID del amigo" style="width:90%">
+            <button class="btn" onclick="conectar()">Conectar</button>
+            <div id="my-id" style="font-size: 9px; margin-top:5px;">Generando ID...</div>
+        </div>
+        <div class="panel">
+            <strong>Historial del Juego</strong>
+            <div id="log"></div>
+        </div>
     </div>
 </div>
 
 <script>
     const peer = new Peer();
-    let conn, miTurno = true, dinero = 1000, miPos = 0;
+    let conn, miTurno = false, miPos = 0, dinero = 1000;
     const mapa = [
-        {n: "SALIDA", p: 0}, {n: "TÉ", p: 100}, {n: "SUERTE", p: 0}, {n: "BOUTIQUE", p: 200}, {n: "HOME", p: 0},
-        {n: "CAFÉ", p: 150}, {n: "PARQUE", p: 120}, {n: "POLICÍA", p: 0}, {n: "SPA", p: 250}, {n: "VILLA 1", p: 300},
-        {n: "MALL", p: 350}, {n: "JOYAS", p: 400}, {n: "VILLA 2", p: 200}, {n: "AEROPUERTO", p: 0}, {n: "VILLA 3", p: 220},
-        {n: "GYM", p: 180}, {n: "VILLA 4", p: 250}, {n: "SUERTE", p: 0}, {n: "VILLA 5", p: 300}, {n: "HOME", p: 0}
+        {n: "SALIDA", p:0}, {n: "TÉ", p:100}, {n: "SUERTE", p:0}, {n: "BOUTIQUE", p:200}, {n: "HOME", p:0},
+        {n: "CAFÉ", p:150}, {n: "PARQUE", p:120}, {n: "POLICÍA", p:0}, {n: "SPA", p:250}, {n: "VILLA 1", p:300},
+        {n: "MALL", p:350}, {n: "JOYAS", p:400}, {n: "VILLA 2", p:200}, {n: "AEROPUERTO", p:0}, {n: "VILLA 3", p:220},
+        {n: "GYM", p:180}, {n: "VILLA 4", p:250}, {n: "SUERTE", p:0}
     ];
 
-    peer.on('open', id => document.getElementById('my-peer-id').innerText = id);
-    peer.on('connection', c => { conn = c; setup(c); });
+    function log(m) { 
+        const l = document.getElementById('log'); 
+        l.innerHTML += `<div>> ${m}</div>`; 
+        l.scrollTop = l.scrollHeight; 
+    }
+
+    peer.on('open', id => { document.getElementById('my-id').innerText = "Tu ID: " + id; });
+    peer.on('connection', c => { conn = c; setup(c); miTurno = false; });
 
     function conectar() {
-        conn = peer.connect(document.getElementById('rival-id').value);
+        conn = peer.connect(document.getElementById('peer-id').value);
         setup(conn);
+        miTurno = true;
+        document.getElementById('turno-text').innerText = "TU TURNO";
     }
 
     function setup(c) {
-        c.on('open', () => document.getElementById('status').innerText = "✅ Conectado");
+        c.on('open', () => log("¡Conectado!"));
         c.on('data', d => {
-            if(d.type === 'MOVE') { mover(d.val); miTurno = true; }
+            if(d.type === 'MOVE') {
+                log("Amigo avanzó " + d.val);
+                miTurno = true;
+                document.getElementById('turno-text').innerText = "TU TURNO";
+            }
         });
     }
 
-    function tirar() {
-        if(!miTurno || !conn) return alert("No es tu turno o no hay conexión");
+    function tirarDado() {
+        if(!miTurno || !conn) return log("No es tu turno.");
         let val = Math.floor(Math.random()*6)+1;
-        mover(val);
+        miPos = (miPos + val) % mapa.length;
+        log("Sacaste " + val + ". Caíste en " + mapa[miPos].n);
         conn.send({type: 'MOVE', val: val});
         miTurno = false;
-    }
-
-    function mover(pasos) {
-        miPos = (miPos + pasos) % mapa.length;
-        document.getElementById('status').innerText = "Cayó en: " + mapa[miPos].n;
+        document.getElementById('turno-text').innerText = "ESPERANDO...";
     }
 
     function comprar() {
-        let precio = mapa[miPos].p;
-        if(precio > 0 && dinero >= precio) {
-            dinero -= precio;
-            document.getElementById('dinero').innerText = dinero;
-            alert("Propiedad comprada");
-        } else alert("No puedes comprar esto");
+        if(mapa[miPos].p > 0 && dinero >= mapa[miPos].p) {
+            dinero -= mapa[miPos].p;
+            log("Compraste " + mapa[miPos].n + " por $" + mapa[miPos].p);
+        } else log("No se puede comprar.");
     }
 
-    function build() {
-        const m = document.getElementById('board-mesh');
-        const c = document.createElement('div');
-        c.className = 'b-cell center-zone';
-        c.innerHTML = `<div onclick="tirar()" style="font-size:30px; cursor:pointer">🎲</div>`;
-        m.appendChild(c);
-        mapa.forEach((obj, i) => {
-            const d = document.createElement('div');
-            d.className = 'b-cell'; d.id = 'cell-'+i;
-            d.innerHTML = `${obj.n}<br>${obj.p > 0 ? '$'+obj.p : ''}`;
-            m.appendChild(d);
-        });
-    }
-    build();
+    // Dibujar 18 casillas
+    const board = document.getElementById('board');
+    mapa.forEach((m, i) => {
+        const d = document.createElement('div');
+        d.className = 'cell'; d.id = 'cell-'+i;
+        d.innerHTML = `${m.n}<br>${m.p > 0 ? '$'+m.p : ''}`;
+        board.appendChild(d);
+    });
 </script>
 </body>
 </html>
