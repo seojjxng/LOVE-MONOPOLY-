@@ -8,87 +8,88 @@
         body { background: #fff0f3; font-family: 'Montserrat', sans-serif; display: flex; justify-content: center; padding: 20px; color: #c71585; }
         .container { display: flex; gap: 25px; width: 950px; }
         .board { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(5, 100px); gap: 8px; background: #ffccd5; padding: 15px; border-radius: 25px; position: relative; }
-        .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; cursor: pointer; transition: 0.3s; }
-        .token { width: 35px; height: 35px; position: absolute; transition: all 0.5s ease; z-index: 10; pointer-events: none; border-radius: 50%; }
-        #p1 { border: 2px solid #555; } /* Perro */
-        #p2 { border: 2px solid #fff; } /* Caballo */
-        .center-zone { grid-column: 2 / 5; grid-row: 2 / 5; background: #fff5f7; border: 3px dashed #ff80bf; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .btn { width: 70%; padding: 8px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; }
+        .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; position: relative; }
+        .center-zone { grid-column: 2 / 5; grid-row: 2 / 5; background: #fff5f7; border: 3px dashed #ff80bf; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; }
+        .token { width: 30px; height: 30px; position: absolute; transition: all 0.5s ease; z-index: 10; pointer-events: none; border-radius: 5px; }
+        #modal { display: none; position: fixed; top: 30%; left: 40%; width: 300px; background: #fff0f9; border: 3px solid #ff80bf; padding: 20px; border-radius: 5px; text-align: center; z-index: 100; box-shadow: 10px 10px 0 #ff80bf; }
+        .btn { padding: 10px 20px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
+
+<div id="modal">
+    <h3 id="modal-title" style="color: #c71585;">¡SUERTE!</h3>
+    <p id="modal-desc"></p>
+    <button class="btn" onclick="document.getElementById('modal').style.display='none'">Aceptar</button>
+</div>
 
 <img src="https://i.imgur.com/FGnMi8Y.png" id="p1" class="token">
 <img src="https://i.imgur.com/fRZJfP8.png" id="p2" class="token">
 
 <div class="container">
-    <div class="board" id="board">
-        <div class="center-zone">
-            <div id="turno-text">ESPERANDO...</div>
-            <div class="dice" onclick="tirarDado()" style="font-size: 40px; cursor: pointer;">🎲</div>
-            <button class="btn" onclick="comprar()">COMPRAR</button>
-        </div>
-    </div>
-    <div class="sidebar">
-        <div class="panel"><strong>ID:</strong> <span id="my-id"></span></div>
-        <div class="panel"><strong>Historial</strong><div id="log" style="height: 150px; overflow:auto;"></div></div>
+    <div class="board" id="board"></div>
+    <div class="center-zone">
+        <div id="turno-text">ESPERANDO...</div>
+        <div class="dice" onclick="tirarDado()" style="font-size: 40px; cursor: pointer;">🎲</div>
+        <div style="margin-top:10px;">Tú: $<span id="dinero-mio">1000</span></div>
     </div>
 </div>
 
 <script>
     const peer = new Peer();
-    let conn, miTurno = false, miPos = 0, amigoPos = 0;
-    
-    function moverFicha(id, pos) {
-        const cell = document.getElementById('cell-' + pos);
-        const rect = cell.getBoundingClientRect();
-        const t = document.getElementById(id);
-        // Si están en la misma casilla, p2 se desplaza a la derecha
-        const offset = (id === 'p2' && miPos === amigoPos) ? 40 : 0;
-        t.style.left = (rect.left + 5 + offset) + 'px';
-        t.style.top = (rect.top + 5) + 'px';
+    let conn, miTurno = false, miPos = 0, amigoPos = 0, miDinero = 1000, bloqueado = false;
+    const mapa = Array.from({length: 18}, (_, i) => ({n: i === 0 ? "SALIDA" : (i === 2 ? "SUERTE" : (i === 4 || i === 13 ? "POLICÍA" : "CASILLA " + i))}));
+
+    function moverFichas() {
+        [ {id: 'p1', pos: miPos, off: 0}, {id: 'p2', pos: amigoPos, off: 35} ].forEach(p => {
+            const cell = document.getElementById('cell-' + p.pos);
+            const rect = cell.getBoundingClientRect();
+            const el = document.getElementById(p.id);
+            // Evita superposición sumando offset si están en la misma casilla
+            const isOverlap = (miPos === amigoPos);
+            el.style.left = (rect.left + 5 + (isOverlap ? p.off : 0)) + 'px';
+            el.style.top = (rect.top + 5) + 'px';
+        });
     }
 
-    function log(m) { const l = document.getElementById('log'); l.innerHTML += `<div>> ${m}</div>`; }
+    function activarSuerte() {
+        const obs = [{t:"Lotería", m:"¡Ganaste la lotería!", v:300}, {t:"Herencia", m:"Herencia recibida.", v:500}, {t:"Calle", m:"Dinero encontrado.", v:50}];
+        const res = obs[Math.floor(Math.random()*obs.length)];
+        miDinero += res.v;
+        document.getElementById('modal-title').innerText = res.t;
+        document.getElementById('modal-desc').innerText = res.m + " +$" + res.v;
+        document.getElementById('modal').style.display = 'block';
+        document.getElementById('dinero-mio').innerText = miDinero;
+    }
 
     function tirarDado() {
-        if(!miTurno) return;
+        if(!miTurno || bloqueado) return;
         let val = Math.floor(Math.random()*6)+1;
-        miPos = (miPos + val) % 18; // 18 casillas
-        moverFicha('p1', miPos);
-        conn.send({type: 'MOVE', pos: miPos});
+        let nuevaPos = (miPos + val);
+        if (nuevaPos >= 18) { miDinero += 100; document.getElementById('dinero-mio').innerText = miDinero; }
+        miPos = nuevaPos % 18;
+        
+        if (mapa[miPos].n === "POLICÍA") bloqueado = true;
+        if (mapa[miPos].n === "SUERTE") activarSuerte();
+        
+        conn.send({type: 'MOVE', pos: miPos, lock: bloqueado});
         miTurno = false;
         document.getElementById('turno-text').innerText = "ESPERANDO...";
+        moverFichas();
     }
 
-    peer.on('connection', c => { 
-        conn = c; 
-        log("Conectado");
-        miTurno = true; // El host empieza
-        document.getElementById('turno-text').innerText = "¡ES TU TURNO!";
-        conn.send({type: 'START', turno: false});
+    peer.on('connection', c => { conn = c; miTurno = true; document.getElementById('turno-text').innerText = "¡ES TU TURNO!"; });
+    
+    // Configuración de grid
+    const board = document.getElementById('board');
+    mapa.forEach((m, i) => {
+        const d = document.createElement('div');
+        d.className = 'cell'; d.id = 'cell-' + i; d.innerText = m.n;
+        board.appendChild(d);
     });
 
-    function conectar() {
-        conn = peer.connect(document.getElementById('peer-id').value);
-        miTurno = false;
-        document.getElementById('turno-text').innerText = "ESPERANDO...";
-    }
-
-    // Configurar Setup
-    peer.on('open', id => document.getElementById('my-id').innerText = id);
-    
-    // Generar tablero
-    const board = document.getElementById('board');
-    for(let i=0; i<18; i++) {
-        const d = document.createElement('div');
-        d.className = 'cell'; d.id = 'cell-' + i; d.innerText = i;
-        board.appendChild(d);
-    }
-
     // Listener de datos
-    // En el setup recibido:
-    // conn.on('data', d => { if(d.type === 'MOVE') { amigoPos = d.pos; moverFicha('p2', amigoPos); miTurno = true; } });
+    peer.on('open', id => console.log(id));
 </script>
 </body>
 </html>
