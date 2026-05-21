@@ -14,7 +14,9 @@
         .panel { background: #fff0f9; padding: 20px; border-radius: 20px; border: 2px solid #ffccd5; }
         .btn { width: 70%; padding: 8px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin: 5px 0; font-size: 11px; }
         .token { width: 35px; height: 35px; position: absolute; z-index: 10; transition: all 0.5s ease; pointer-events: none; border-radius: 5px; }
-        .dice { width: 60px; height: 60px; background: #ff59aa; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: bold; cursor: pointer; box-shadow: 0 5px #c71585; margin: 10px; }
+        /* Nuevo dado */
+        .dice-img { width: 60px; height: 60px; cursor: pointer; transition: transform 0.2s; margin: 10px; }
+        .dice-img:active { transform: scale(0.9); }
         #log { height: 180px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; }
         #modal { display: none; position: fixed; top: 30%; left: 40%; width: 300px; background: #fff0f9; border: 3px solid #ff80bf; padding: 20px; border-radius: 15px; text-align: center; z-index: 100; box-shadow: 5px 5px 15px rgba(0,0,0,0.2); }
     </style>
@@ -34,8 +36,7 @@
     <div class="board" id="board">
         <div class="center-zone">
             <div id="turno-text" style="margin-bottom: 5px; font-size: 10px; font-weight: bold;">ESPERANDO...</div>
-            <div id="dice-result">-</div>
-            <div class="dice" onclick="tirarDado()">🎲</div>
+            <img src="https://i.imgur.com/Nsafzb4.png" class="dice-img" onclick="tirarDado()">
             <button class="btn" onclick="comprar()">COMPRAR / MEJORAR</button>
             <div style="font-size: 12px; color: #c71585;">💖 Tú: $<span id="dinero-mio">1000</span> | 💎 Amigo: $<span id="dinero-amigo">1000</span></div>
         </div>
@@ -69,44 +70,42 @@
         });
     }
 
-    function comprar() {
-        let actual = mapa[miPos];
-        if (actual.p > 0 && actual.owner === null) {
-            miDinero -= actual.p;
-            actual.owner = 'yo';
-            document.getElementById('dinero-mio').innerText = miDinero;
-            document.getElementById('cell-' + miPos).style.background = "#ffe4e9";
-            log("Has comprado " + actual.n);
-        } else { log("No se puede comprar aquí."); }
-    }
-
     function tirarDado() {
         if(!miTurno) return;
         let val = Math.floor(Math.random()*6)+1;
         let prevPos = miPos;
         miPos = (miPos + val) % mapa.length;
-        if(miPos < prevPos) { miDinero += 100; log("¡Pasaste por SALIDA: +$100!"); }
-        if(mapa[miPos].n === "SUERTE") {
-            let v = [300, 500, 50][Math.floor(Math.random()*3)];
-            miDinero += v;
-            document.getElementById('modal-text').innerText = "Ganaste $" + v + " por suerte.";
-            document.getElementById('modal').style.display = 'block';
-        }
-        document.getElementById('dinero-mio').innerText = miDinero;
+        if(miPos < prevPos) { miDinero += 100; document.getElementById('dinero-mio').innerText = miDinero; }
         moverFichas();
-        if(conn) conn.send({type: 'MOVE', pos: miPos});
+        conn.send({type: 'MOVE', pos: miPos});
+        miTurno = false;
+        document.getElementById('turno-text').innerText = "ESPERANDO...";
+    }
+
+    function conectar() {
+        let id = document.getElementById('peer-id').value;
+        conn = peer.connect(id);
+        setupConn();
         miTurno = false;
     }
 
-    // Inicializar tablero visual
+    function setupConn() {
+        conn.on('open', () => log("Conectado!"));
+        conn.on('data', d => {
+            if(d.type === 'MOVE') { amigoPos = d.pos; moverFichas(); miTurno = true; document.getElementById('turno-text').innerText = "¡TU TURNO!"; }
+        });
+    }
+
+    peer.on('open', id => document.getElementById('my-id').innerText = id);
+    peer.on('connection', c => { conn = c; setupConn(); miTurno = true; document.getElementById('turno-text').innerText = "¡TU TURNO!"; });
+
+    // Renderizar tablero
     const board = document.getElementById('board');
     mapa.forEach((m, i) => {
         const d = document.createElement('div');
         d.className = 'cell'; d.id = 'cell-' + i; d.innerText = m.n;
         board.appendChild(d);
     });
-
-    peer.on('connection', c => { conn = c; miTurno = true; });
     setTimeout(moverFichas, 500);
 </script>
 </body>
