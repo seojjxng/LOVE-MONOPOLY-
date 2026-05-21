@@ -107,30 +107,20 @@
             }
             let val = Math.floor(Math.random()*6)+1;
             document.getElementById('dado-valor').innerText = val;
-            let nuevaPos = j.pos + val;
             
+            // Movimiento lineal exacto:
+            let nuevaPos = j.pos + val;
             if(nuevaPos >= mapa.length) {
+                nuevaPos = nuevaPos % mapa.length;
                 let ingreso = 100;
                 let deuda = j.deuda || 0;
-                let pago = 0;
-                if(deuda > 0) {
-                    pago = Math.min(ingreso * 0.5, deuda);
-                    db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ dinero: (j.dinero || 0) + (ingreso - pago), deuda: deuda - pago });
-                    log(nombres[miIdx] + " pasó por SALIDA: Banco retuvo $" + pago + " de deuda.");
-                } else {
-                    db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => (d || 0) + ingreso);
-                    log(nombres[miIdx] + " pasó por SALIDA: +$100");
-                }
-                nuevaPos = nuevaPos % mapa.length;
+                let pago = Math.min(ingreso * 0.5, deuda);
+                db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ dinero: (j.dinero || 0) + (ingreso - pago), deuda: deuda - pago });
+                log(nombres[miIdx] + " pasó por SALIDA: Banco retuvo $" + pago + " de deuda.");
             }
             
-            if(nuevaPos === 4) { 
-                db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: 11, enCarcel: true }); 
-                log(nombres[miIdx] + " ha sido arrestado.");
-            } else { 
-                db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: nuevaPos }); 
-                verificarCasilla(nuevaPos, j.dinero);
-            }
+            db.ref('salas/' + sala + '/jugadores/' + miIdx + '/pos').set(nuevaPos);
+            verificarCasilla(nuevaPos, j.dinero);
             db.ref('salas/' + sala + '/turno').set((s.turno + 1) % s.jugadores.length);
         });
     }
@@ -158,6 +148,12 @@
         let div = document.getElementById('acciones'); div.innerHTML = "";
         let propRef = db.ref('salas/' + sala + '/propiedades/' + pos);
         
+        if(pos === 4) { 
+            db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: 11, enCarcel: true }); 
+            log(nombres[miIdx] + " ha sido arrestado.");
+            return;
+        }
+
         if(pos === 12) {
             let tipo = ["Prendas", "Agua", "Luz"][Math.floor(Math.random()*3)];
             let monto = Math.floor(Math.random()*101) + 50;
