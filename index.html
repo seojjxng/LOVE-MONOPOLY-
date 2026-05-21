@@ -28,8 +28,8 @@
         <div class="center-zone">
             <div id="turno-text" style="font-weight:bold;">ESPERANDO...</div>
             <img src="https://i.imgur.com/Nsafzb4.png" class="dice-img" onclick="tirarDado()">
-            <button class="btn" onclick="comprar()">COMPRAR</button>
-            <div>💖 $<span id="dinero">1000</span></div>
+            <button class="btn" onclick="comprar()">COMPRAR CASILLA</button>
+            <div>💖 $<span id="dinero-mio">1000</span></div>
         </div>
     </div>
     <div class="sidebar">
@@ -45,32 +45,36 @@
 
 <script>
     const peer = new Peer();
-    let conn, miTurno = false, miPos = 0, dinero = 1000;
-    const mapa = Array(16).fill({n: "CASILLA", p: 100, owner: null});
+    let conn, miTurno = false, miPos = 0, juegoIniciado = false;
+    let miDinero = 1000;
+    
+    const mapa = [
+        {n: "SALIDA", p:0}, {n: "TÉ ($100)", p:100, owner:null}, {n: "SUERTE", p:0}, {n: "BOUTIQUE ($200)", p:200, owner:null}, 
+        {n: "¡A LA CÁRCEL!", p:0}, {n: "CAFÉ ($150)", p:150, owner:null}, {n: "PARQUE ($120)", p:120, owner:null}, {n: "SPA ($250)", p:250, owner:null}, 
+        {n: "VILLA 1 ($300)", p:300, owner:null}, {n: "MALL ($350)", p:350, owner:null}, {n: "JOYAS ($400)", p:400, owner:null}, {n: "POLICÍA", p:0}, 
+        {n: "VILLA 3 ($220)", p:220, owner:null}, {n: "SUERTE", p:0}, {n: "COMUNIDAD", p:0}, {n: "VIVIENDA ($500)", p:500, owner:null}
+    ];
 
-    function log(msg) {
-        const l = document.getElementById('log');
-        l.innerHTML += `<div>> ${msg}</div>`;
-        l.scrollTop = l.scrollHeight;
-    }
+    function log(m) { const l = document.getElementById('log'); l.innerHTML += `<div>> ${m}</div>`; l.scrollTop = l.scrollHeight; }
 
     function moverFichas() {
         ['p1', 'p2'].forEach(id => {
-            const pos = (id === 'p1') ? miPos : 0; // Simplified for demo
-            const cell = document.getElementById('cell-' + pos);
+            const cell = document.getElementById('cell-' + miPos);
             const el = document.getElementById(id);
             if(cell && el) {
-                el.style.left = (cell.offsetLeft + (id === 'p1' ? 31 : 29)) + 'px';
+                let offset = (id === 'p1') ? 31 : 29;
+                el.style.left = (cell.offsetLeft + offset) + 'px';
                 el.style.top = (cell.offsetTop + 30) + 'px';
             }
         });
     }
 
     function tirarDado() {
+        if(!juegoIniciado) return log("El juego no ha empezado.");
         if(!miTurno) return log("No es tu turno.");
         let val = Math.floor(Math.random()*6)+1;
-        log("Sacaste un " + val);
-        miPos = (miPos + val) % 16;
+        miPos = (miPos + val) % mapa.length;
+        log("Sacaste " + val + ". Estás en " + mapa[miPos].n);
         moverFichas();
         miTurno = false;
         document.getElementById('turno-text').innerText = "ESPERANDO...";
@@ -78,43 +82,44 @@
     }
 
     function comprar() {
-        if(mapa[miPos].owner) return log("Esta casilla ya tiene dueño.");
-        if(dinero >= 100) {
-            dinero -= 100;
-            mapa[miPos].owner = 'yo';
-            document.getElementById('dinero').innerText = dinero;
-            log("Compraste casilla " + miPos);
-        } else {
-            log("¡No tienes suficiente dinero para comprar!");
-        }
+        if(!juegoIniciado) return log("Error: El juego aún no empieza.");
+        let actual = mapa[miPos];
+        if(actual.p === 0) return log("Esta casilla no se puede comprar.");
+        if(actual.owner) return log("Ya tiene dueño.");
+        if(miDinero < actual.p) return log("No tienes suficiente dinero.");
+        
+        miDinero -= actual.p;
+        actual.owner = 'yo';
+        document.getElementById('dinero-mio').innerText = miDinero;
+        log("Compraste " + actual.n);
     }
 
-    peer.on('open', id => document.getElementById('my-id').innerText = "ID: " + id);
-    
     function conectar() {
-        const id = document.getElementById('peer-id').value;
-        conn = peer.connect(id);
+        conn = peer.connect(document.getElementById('peer-id').value);
         setupConn();
     }
 
-    peer.on('connection', c => { conn = c; setupConn(); });
-
     function setupConn() {
-        conn.on('open', () => { 
+        conn.on('open', () => {
             log("Conexión establecida.");
+            juegoIniciado = true;
             miTurno = true;
             document.getElementById('turno-text').innerText = "¡TU TURNO!";
+            log("Juego iniciado. ¡Es tu turno!");
         });
         conn.on('data', d => {
-            if(d.type === 'MOVE') { miTurno = true; document.getElementById('turno-text').innerText = "¡TU TURNO!"; }
+            if(d.type === 'MOVE') { miTurno = true; document.getElementById('turno-text').innerText = "¡TU TURNO!"; log("Tu turno."); }
         });
     }
 
-    // Init
+    peer.on('open', id => document.getElementById('my-id').innerText = "ID: " + id);
+    peer.on('connection', c => { conn = c; setupConn(); juegoIniciado = true; });
+
+    // Init tablero
     const board = document.getElementById('board');
     mapa.forEach((m, i) => {
         const d = document.createElement('div');
-        d.className = 'cell'; d.id = 'cell-' + i; d.innerText = "C" + i;
+        d.className = 'cell'; d.id = 'cell-' + i; d.innerHTML = m.n.replace('(', '<br>(');
         board.appendChild(d);
     });
     window.onload = () => setTimeout(moverFichas, 500);
