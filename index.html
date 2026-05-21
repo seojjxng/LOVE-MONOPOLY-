@@ -9,8 +9,6 @@
         .container { display: flex; gap: 25px; width: 950px; }
         .board { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(5, 100px); gap: 8px; background: #ffccd5; padding: 15px; border-radius: 25px; position: relative; }
         .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; cursor: pointer; }
-        .owned-host { background-color: #add8e6 !important; }
-        .owned-visitante { background-color: #ffb6c1 !important; }
         .token { width: 35px; height: 35px; position: absolute; z-index: 10; transition: all 0.5s ease; pointer-events: none; }
         .center-zone { grid-column: 2 / 5; grid-row: 2 / 5; background: #fff5f7; border: 3px dashed #ff80bf; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; }
         .sidebar { width: 320px; display: flex; flex-direction: column; gap: 20px; }
@@ -19,16 +17,9 @@
         .input-field { width: 93%; padding: 8px; margin: 5px 0; border: 1px solid #ffccd5; border-radius: 8px; }
         .dice-img { width: 60px; height: 60px; cursor: pointer; margin: 10px; }
         #log { height: 300px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; }
-        #notification-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #fff0f9; border: 3px solid #ff80bf; padding: 20px; border-radius: 5px; z-index: 100; box-shadow: 5px 5px 0px #ffccd5; text-align: center; color: #c71585; }
     </style>
 </head>
 <body>
-
-<div id="notification-modal">
-    <div id="modal-title" style="font-weight:bold; font-size: 16px; margin-bottom: 5px;"></div>
-    <div id="modal-text" style="font-size: 12px; margin-bottom: 15px;"></div>
-    <button class="btn" onclick="document.getElementById('notification-modal').style.display='none'">OK</button>
-</div>
 
 <div class="container">
     <div class="board" id="board">
@@ -62,10 +53,10 @@
     const nombres = ["Dog", "Horse", "Hat", "Car"];
 
     const mapa = [
-        {n: "SALIDA", p:0, up:0}, {n: "IGLESIA", p:100, owner:null, up:0}, {n: "?", p:0, up:0}, {n: "BOUTIQUE", p:200, owner:null, up:0}, 
-        {n: "¡A LA CÁRCEL!", p:0, up:0}, {n: "CHEONGDAM", p:500, owner:null, up:0}, {n: "GANGNAM", p:520, owner:null, up:0}, {n: "SEOCHO-GU", p:250, owner:null, up:0}, 
-        {n: "MAPO", p:300, owner:null, up:0}, {n: "INCHEON", p:350, owner:null, up:0}, {n: "JOYAS", p:400, owner:null, up:0}, {n: "CÁRCEL", p:0, up:0}, 
-        {n: "VILLA 3", p:220, owner:null, up:0}, {n: "?", p:0, up:0}, {n: "ARCA COMUNAL", p:0, up:0}, {n: "BUKCHON", p:500, owner:null, up:0}
+        {n: "SALIDA", p:0}, {n: "IGLESIA", p:100}, {n: "?", p:0}, {n: "BOUTIQUE", p:200}, 
+        {n: "¡CÁRCEL!", p:0}, {n: "CHEONGDAM", p:500}, {n: "GANGNAM", p:520}, {n: "SEOCHO", p:250}, 
+        {n: "MAPO", p:300}, {n: "INCHEON", p:350}, {n: "JOYAS", p:400}, {n: "CÁRCEL", p:0}, 
+        {n: "VILLA 3", p:220}, {n: "?", p:0}, {n: "ARCA", p:0}, {n: "BUKCHON", p:500}
     ];
 
     function log(m) { const l = document.getElementById('log'); l.innerHTML += `<div>> ${m}</div>`; l.scrollTop = l.scrollHeight; }
@@ -75,7 +66,7 @@
     peer.on('connection', conn => {
         let nuevoIdx = conexiones.length + 1;
         conexiones.push({idx: nuevoIdx, conn: conn});
-        conn.send({type: 'INIT', idx: nuevoIdx});
+        conn.send({type: 'INIT', idx: nuevoIdx, pos: posiciones});
         conn.on('data', d => manejarDatos(d));
         log(nombres[nuevoIdx] + " se unió.");
     });
@@ -86,13 +77,14 @@
     }
 
     function manejarDatos(d) {
-        if(d.type === 'INIT') miIdx = d.idx;
+        if(d.type === 'INIT') { miIdx = d.idx; posiciones = d.pos; moverFichas(); }
         if(d.type === 'MOVE') {
             posiciones[d.idx] = d.pos;
             turnoActual = d.nextTurn; 
             document.getElementById('turno-text').innerText = "Turno: " + nombres[turnoActual];
             moverFichas();
             log(nombres[d.idx] + " se movió a " + d.pos);
+            // El Host reenvía el movimiento a TODOS los invitados
             if(miIdx === 0) conexiones.forEach(c => c.conn.send(d));
         }
     }
@@ -107,11 +99,11 @@
 
     function tirarDado() {
         if(miIdx !== turnoActual) { log("Espera... turno de: " + nombres[turnoActual]); return; }
-        
         posiciones[miIdx] = (posiciones[miIdx] + Math.floor(Math.random()*6)+1) % mapa.length;
-        let siguienteTurno = (miIdx + 1) % 4;
-        let d = {type: 'MOVE', idx: miIdx, pos: posiciones[miIdx], nextTurn: siguienteTurno};
+        let siguienteTurno = (miIdx + 1) % conexiones.length + 1; 
+        if(miIdx === 0) siguienteTurno = 1;
         
+        let d = {type: 'MOVE', idx: miIdx, pos: posiciones[miIdx], nextTurn: siguienteTurno};
         manejarDatos(d);
         if(hostConn) hostConn.send(d);
     }
@@ -122,7 +114,6 @@
         d.className = 'cell'; d.id = 'cell-' + i; d.innerHTML = `${m.n}<br>${m.p > 0 ? '$'+m.p : ''}`;
         board.appendChild(d);
     });
-
     function comprar() {} function mejorar() {}
 </script>
 </body>
