@@ -53,6 +53,7 @@
 </div>
 
 <div id="modal">
+    <h3 id="modal-title" style="margin:0"></h3>
     <p id="modal-text" style="color:#c71585; font-weight:bold"></p>
     <button class="btn" onclick="document.getElementById('modal').style.display='none'">Aceptar</button>
 </div>
@@ -98,10 +99,23 @@
             let val = Math.floor(Math.random()*6)+1;
             document.getElementById('dado-valor').innerText = val;
             let j = s.jugadores[miIdx];
-            let pos = (j.pos + val) % mapa.length;
-            if(pos === 4) { db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: 11, enCarcel: true }); log(nombres[miIdx] + " en cárcel."); }
-            else { if(pos < j.pos) j.dinero += 100; db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: pos, dinero: j.dinero }); }
-            verificarCasilla(pos, j.dinero);
+            let nuevaPos = j.pos + val;
+            let pos = nuevaPos % mapa.length;
+            
+            if(nuevaPos >= mapa.length) { 
+                db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d + 100);
+            }
+
+            if(pos === 4) { 
+                document.getElementById('modal-title').innerText = "¡Arresto!";
+                document.getElementById('modal-text').innerText = "¡Estás bajo arresto! Serás enviado a la cárcel, tienes derecho a un abogado.";
+                document.getElementById('modal').style.display = 'block';
+                db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: 11, enCarcel: true }); 
+                log(nombres[miIdx] + " en cárcel."); 
+            } else { 
+                db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: pos }); 
+                verificarCasilla(pos, j.dinero);
+            }
             db.ref('salas/' + sala + '/turno').set((s.turno + 1) % s.jugadores.length);
         });
     }
@@ -111,7 +125,8 @@
         let tipo = mapa[pos].n;
         if(tipo === "?" || tipo === "ARCA") {
             let ev = eventos[Math.floor(Math.random()*eventos.length)];
-            db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').set(dinero + (ev.g ? ev.m : -ev.m));
+            db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d + (ev.g ? ev.m : -ev.m));
+            document.getElementById('modal-title').innerText = tipo === "?" ? "Suerte" : "Arca Comunal";
             document.getElementById('modal-text').innerText = ev.txt + (ev.g ? " +$" : " -$") + ev.m;
             document.getElementById('modal').style.display = 'block';
         } else if (mapa[pos].p > 0) {
