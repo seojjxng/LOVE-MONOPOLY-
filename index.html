@@ -63,10 +63,11 @@
             db.ref('jugadores/' + miIdx).set({ activo: true });
             document.getElementById('p' + miIdx).style.display = 'block';
             document.getElementById('turno-text').innerText = "Eres Jugador " + (miIdx + 1);
+        } else {
+            alert("Sala llena");
         }
     });
 
-    // Crear tablero visual
     const board = document.getElementById('board');
     for(let i=0; i<36; i++) {
         const d = document.createElement('div');
@@ -74,19 +75,16 @@
         board.appendChild(d);
     }
 
-    // Sincronización en tiempo real
     db.ref('game').on('value', snap => {
         const data = snap.val();
         if(!data) return;
         
-        // Mover fichas
         data.pos.forEach((p, i) => {
             const el = document.getElementById('p'+i);
             const cell = document.getElementById('cell-'+p);
             if(cell && el) { el.style.left = (cell.offsetLeft + 5) + 'px'; el.style.top = (cell.offsetTop + 5) + 'px'; }
         });
 
-        // Mostrar resultado del dado
         if(data.lastRoll) document.getElementById('dice-result').innerText = data.lastRoll;
     });
 
