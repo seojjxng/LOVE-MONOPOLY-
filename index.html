@@ -57,7 +57,7 @@
 
     let miIdx = -1, sala = "", miDinero = 1000;
     const colores = ["#ffccd5", "#ffe4e1", "#e0ffff", "#f0fff0", "#fff0f5"];
-    const mapa = [{n:"SALIDA",p:0},{n:"IGLESIA",p:100},{n:"?",p:0},{n:"BOUTIQUE",p:200},{n:"CÁRCEL",p:0},{n:"CHEONGDAM",p:500},{n:"GANGNAM",p:520},{n:"SEOCHO-GU",p:250},{n:"MAPO",p:300},{n:"INCHEON",p:350},{n:"JOYAS",p:400},{n:"CÁRCEL",p:0},{n:"VILLA 3",p:220},{n:"?",p:0},{n:"ARCA",p:0},{n:"BUKCHON",p:500}];
+    const mapa = [{n:"SALIDA",p:0},{n:"IGLESIA",p:100},{n:"?",p:0},{n:"BOUTIQUE",p:200},{n:"A LA CÁRCEL",p:0},{n:"CHEONGDAM",p:500},{n:"GANGNAM",p:520},{n:"SEOCHO-GU",p:250},{n:"MAPO",p:300},{n:"INCHEON",p:350},{n:"JOYAS",p:400},{n:"CÁRCEL",p:0},{n:"VILLA 3",p:220},{n:"?",p:0},{n:"ARCA",p:0},{n:"BUKCHON",p:500}];
 
     function agregarLog(txt) { document.getElementById('log').innerHTML += `<div>${txt}</div>`; }
     function mostrarModal(txt) { document.getElementById('modal-text').innerText = txt; document.getElementById('modal').style.display = 'block'; }
@@ -83,22 +83,36 @@
                 return;
             }
             let val = Math.floor(Math.random()*6)+1;
-            let nuevaPos = (snap.val().pos + val) % mapa.length;
-            let esCarcel = (nuevaPos === 4 || nuevaPos === 11) ? 1 : 0;
+            let posActual = snap.val().pos;
+            let nuevaPos = (posActual + val) % mapa.length;
+            
+            // Lógica Salida (+100)
+            if(nuevaPos < posActual) { miDinero += 100; document.getElementById('dinero-mio').innerText = miDinero; agregarLog("Pasaste por salida, ganas $100"); }
+            
+            // Lógica Cárcel
+            let esCarcel = 0;
+            if(nuevaPos === 4) { nuevaPos = 11; esCarcel = 1; agregarLog("¡A LA CÁRCEL!"); }
+            
             db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: nuevaPos, carcel: esCarcel });
             agregarLog("J" + (miIdx + 1) + " sacó " + val);
         });
     }
 
     function verificarCasilla(pos) {
-        const div = document.getElementById('acciones'); 
-        div.innerHTML = "";
-        
+        const div = document.getElementById('acciones'); div.innerHTML = "";
         db.ref('salas/' + sala + '/propiedades/' + pos).once('value', snap => {
             if(!snap.exists() && mapa[pos].p > 0) {
                 div.innerHTML = `<button class="btn" onclick="comprar(${pos})">Comprar $${mapa[pos].p}</button>`;
             } else if(snap.exists() && snap.val().owner != miIdx) {
-                // Alquiler
+                let niv = snap.val().nivel || 1;
+                let pct = (niv === 1) ? 0.10 : (niv === 2 ? 0.15 : 0.25);
+                let alquiler = Math.floor(mapa[pos].p * pct);
+                if(miDinero >= alquiler) {
+                    miDinero -= alquiler;
+                    document.getElementById('dinero-mio').innerText = miDinero;
+                    db.ref('salas/' + sala + '/jugadores/' + snap.val().owner + '/dinero').transaction(d => (d || 1000) + alquiler);
+                    agregarLog("Pagaste $" + alquiler + " de alquiler a J" + (snap.val().owner + 1));
+                }
             }
         });
     }
@@ -120,7 +134,6 @@
     }
 
     function sincronizar() {
-        // Sincronizar Fichas
         db.ref('salas/' + sala + '/jugadores').on('value', snap => {
             snap.forEach(child => {
                 let el = document.getElementById('p' + child.key);
@@ -128,12 +141,10 @@
                 if(cell && el) { 
                     el.style.left = (cell.offsetLeft + 30) + 'px'; 
                     el.style.top = (cell.offsetTop + 30) + 'px'; 
-                    // SI ES MI JUGADOR, VERIFICAR CASILLA AL MOVERSE
                     if(child.key == miIdx) verificarCasilla(child.val().pos);
                 }
             });
         });
-        // Sincronizar Propiedades
         db.ref('salas/' + sala + '/propiedades').on('value', snap => {
             snap.forEach(child => {
                 document.getElementById('cell-' + child.key).style.backgroundColor = colores[child.val().owner % colores.length];
