@@ -56,15 +56,16 @@
         {n: "GYM ($180)", p:180}, {n: "PRÉSTAMO", p:-200}, {n: "VIVIENDA", p:500}
     ];
 
-    // Función log corregida: 'esRemoto' evita el bucle
     function log(m, esRemoto = false) { 
         const l = document.getElementById('log'); 
         l.innerHTML += `<div>> ${m}</div>`; l.scrollTop = l.scrollHeight;
         if(conn && !esRemoto) conn.send({type: 'LOG', msg: m});
     }
 
-    function syncMoney() {
-        if(conn) conn.send({type: 'MONEY_UPDATE', amount: miDinero});
+    function cambiarTurno(estado) {
+        miTurno = estado;
+        document.getElementById('turno-text').innerText = miTurno ? "¡ES TU TURNO!" : "ESPERANDO...";
+        log(miTurno ? "¡Te toca lanzar!" : "Le toca a tu amorcito.");
     }
 
     function comprar() {
@@ -74,7 +75,7 @@
         else if (actual.p > 0 && miDinero >= actual.p) { miDinero -= actual.p; log("Compraste " + actual.n); }
         else return;
         document.getElementById('dinero-mio').innerText = miDinero;
-        syncMoney();
+        if(conn) conn.send({type: 'MONEY_UPDATE', amount: miDinero});
     }
 
     peer.on('open', id => document.getElementById('my-id').innerText = "Tu ID: " + id);
@@ -83,18 +84,17 @@
     function conectar() {
         conn = peer.connect(document.getElementById('peer-id').value);
         setup();
-        miTurno = true;
+        cambiarTurno(true);
         log("¡Conexión establecida!");
     }
 
     function setup() {
         conn.on('data', d => {
             if(d.type === 'MOVE') {
-                miTurno = true;
-                document.getElementById('turno-text').innerText = "TU TURNO";
+                cambiarTurno(true);
                 if(d.bloqueado) { bloqueado = true; log("¡Un turno sin jugar!"); }
             } else if(d.type === 'LOG') {
-                log("Amigo: " + d.msg, true); // true para no reenviar
+                log("Amigo: " + d.msg, true);
             } else if(d.type === 'MONEY_UPDATE') {
                 amigoDinero = d.amount;
                 document.getElementById('dinero-amigo').innerText = amigoDinero;
@@ -104,16 +104,15 @@
 
     function tirarDado() {
         if(!miTurno) return;
-        if(bloqueado) { log("¡Turno perdido!"); bloqueado = false; miTurno = false; return; }
+        if(bloqueado) { log("¡Turno perdido!"); bloqueado = false; cambiarTurno(false); return; }
         
         let val = Math.floor(Math.random()*6)+1;
         miPos = (miPos + val) % mapa.length;
-        log("Caíste en " + mapa[miPos].n);
+        log("Sacaste " + val + ". Caíste en " + mapa[miPos].n);
         
         let b = (mapa[miPos].n === "POLICÍA");
         conn.send({type: 'MOVE', val: val, bloqueado: b});
-        miTurno = false;
-        document.getElementById('turno-text').innerText = "ESPERANDO...";
+        cambiarTurno(false);
     }
 
     const board = document.getElementById('board');
