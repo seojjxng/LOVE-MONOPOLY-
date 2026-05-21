@@ -35,6 +35,7 @@
             <img src="https://i.imgur.com/Nsafzb4.png" style="width:60px; cursor:pointer" onclick="tirarDado()">
             <div id="acciones"></div>
             <div>💖 $<span id="dinero-mio">1000</span></div>
+            <button class="btn" onclick="abrirBanco()">🏦 Banco</button>
         </div>
     </div>
     <div class="sidebar">
@@ -55,6 +56,7 @@
 <div id="modal">
     <h3 id="modal-title" style="margin:0"></h3>
     <p id="modal-text" style="color:#c71585; font-weight:bold"></p>
+    <div id="modal-extra"></div>
     <button class="btn" onclick="document.getElementById('modal').style.display='none'">Aceptar</button>
 </div>
 
@@ -67,11 +69,7 @@
     const nombres = ["Dog", "Horse", "Hat", "Car"];
     const colores = ["#ffccd5", "#dcd0ff", "#c1e1c1", "#fff9c4"];
     const mapa = [{n:"SALIDA",p:0},{n:"IGLESIA",p:100},{n:"?",p:0},{n:"BOUTIQUE",p:200},{n:"A LA CÁRCEL",p:0},{n:"CHEONGDAM",p:500},{n:"GANGNAM",p:520},{n:"SEOCHO-GU",p:250},{n:"MAPO",p:300},{n:"INCHEON",p:350},{n:"JOYAS",p:400},{n:"CÁRCEL",p:0},{n:"VILLA 3",p:220},{n:"?",p:0},{n:"ARCA",p:0},{n:"BUKCHON",p:500}];
-
-    const eventos = [
-        {txt:"¡Ganaste la lotería!", m:200, g:true}, {txt:"¡Heredaste una fortuna!", m:300, g:true},
-        {txt:"Debes impuestos sobre la renta", m:150, g:false}, {txt:"Le debes al banco", m:250, g:false}
-    ];
+    const eventos = [{txt:"¡Ganaste la lotería!", m:200, g:true}, {txt:"¡Heredaste una fortuna!", m:300, g:true}, {txt:"Debes impuestos sobre la renta", m:150, g:false}, {txt:"Le debes al banco", m:250, g:false}];
 
     function log(txt) { document.getElementById('log').innerHTML += `<div>${txt}</div>`; }
 
@@ -80,7 +78,7 @@
         db.ref('salas/' + sala + '/jugadores').once('value', snap => {
             miIdx = snap.numChildren();
             if(miIdx > 3) return;
-            db.ref('salas/' + sala + '/jugadores/' + miIdx).set({ pos: 0, dinero: 1000, enCarcel: false });
+            db.ref('salas/' + sala + '/jugadores/' + miIdx).set({ pos: 0, dinero: 1000, enCarcel: false, deuda: 0 });
             if(miIdx == 0) db.ref('salas/' + sala + '/turno').set(0);
             sincronizar();
         });
@@ -103,7 +101,14 @@
             let pos = nuevaPos % mapa.length;
             
             if(nuevaPos >= mapa.length) { 
-                db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d + 100);
+                let bon = 100;
+                if(j.deuda > 0) {
+                    let desc = Math.min(bon * 0.5, j.deuda);
+                    bon -= desc;
+                    db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ deuda: j.deuda - desc });
+                    log("El banco descontó $" + desc + " de tu deuda.");
+                }
+                db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d + bon);
             }
 
             if(pos === 4) { 
@@ -120,6 +125,22 @@
         });
     }
 
+    function abrirBanco() {
+        document.getElementById('modal-title').innerText = "Banco";
+        document.getElementById('modal-text').innerText = "Solicita un préstamo:";
+        let div = document.getElementById('modal-extra'); div.innerHTML = "";
+        [200, 450, 600, 700].forEach(m => {
+            let b = document.createElement('button'); b.className = 'btn'; b.innerText = "Pedir $" + m;
+            b.onclick = () => {
+                db.ref('salas/' + sala + '/jugadores/' + miIdx).transaction(j => { j.dinero += m; j.deuda += m; return j; });
+                document.getElementById('modal').style.display = 'none';
+            };
+            div.appendChild(b);
+        });
+        div.innerHTML += "<p style='font-size:10px'>Observación: El banco retendrá 50% de ingresos extra hasta saldar deuda.</p>";
+        document.getElementById('modal').style.display = 'block';
+    }
+
     function verificarCasilla(pos, dinero) {
         let div = document.getElementById('acciones'); div.innerHTML = "";
         let tipo = mapa[pos].n;
@@ -131,13 +152,28 @@
             document.getElementById('modal').style.display = 'block';
         } else if (mapa[pos].p > 0) {
             db.ref('salas/' + sala + '/propiedades/' + pos).once('value', s => {
-                if(!s.exists()) div.innerHTML = `<button class="btn" onclick="comprar(${pos})">Comprar $${mapa[pos].p}</button>`;
-                else if(s.val().owner == miIdx && s.val().nivel < 3) div.innerHTML = `<button class="btn" onclick="mejorar(${pos})">Mejorar $50</button>`;
-                else if(s.val().owner != miIdx) {
+                if(!s.exists()) {
+                    if(dinero > 0) div.innerHTML = `<button class="btn" onclick="comprar(${pos})">Comprar $${mapa[pos].p}</button>`;
+                } else if(s.val().owner == miIdx && s.val().nivel < 3) {
+                    if(dinero >= 50) div.innerHTML = `<button class="btn" onclick="mejorar(${pos})">Mejorar $50</button>`;
+                } else if(s.val().owner != miIdx) {
                     let rent = Math.floor(mapa[pos].p * 0.2);
-                    db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d - rent);
-                    db.ref('salas/' + sala + '/jugadores/' + s.val().owner + '/dinero').transaction(d => d + rent);
-                    log("Pagaste $" + rent + " de alquiler a " + nombres[s.val().owner]);
+                    if(miIdx != s.val().owner) {
+                        let jRef = db.ref('salas/' + sala + '/jugadores/' + miIdx);
+                        jRef.once('value', snap => {
+                            let j = snap.val();
+                            let pagado = rent;
+                            if(j.deuda > 0) {
+                                let desc = Math.min(rent * 0.5, j.deuda);
+                                pagado += desc;
+                                jRef.update({ deuda: j.deuda - desc });
+                                log("El banco descontó $" + desc + " de tu deuda.");
+                            }
+                            jRef.child('dinero').transaction(d => d - pagado);
+                            db.ref('salas/' + sala + '/jugadores/' + s.val().owner + '/dinero').transaction(d => d + rent);
+                            log("Pagaste $" + rent + " de alquiler a " + nombres[s.val().owner]);
+                        });
+                    }
                 }
             });
         }
