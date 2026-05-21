@@ -3,90 +3,91 @@
 <head>
     <meta charset="UTF-8">
     <title>Cute Monopoly Town P2P</title>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        *, *::before, *::after { box-sizing: border-box; }
-        body { margin: 0; padding: 15px; background: #fff0f3; font-family: 'Montserrat', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background-image: radial-gradient(#ffccd5 2px, transparent 0); background-size: 24px 24px; }
-        .arcade-container { width: 100%; max-width: 1020px; }
-        .arcade-window { width: 100%; background: #fff; border: 8px solid #ffb3d9; border-radius: 40px; padding: 20px; }
-        .main-layout { display: flex; gap: 20px; }
-        .board-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; width: 600px; aspect-ratio: 1/1; }
-        .b-cell { background: white; border: 2px solid #ffccd5; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: 900; color: #ff59aa; text-align: center; }
+        body { background: #fff0f3; font-family: sans-serif; display: flex; justify-content: center; padding: 20px; }
+        .arcade-container { width: 100%; max-width: 900px; background: white; padding: 20px; border-radius: 40px; border: 8px solid #ffb3d9; }
+        .board-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+        .b-cell { height: 80px; border: 2px solid #ffccd5; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #ff59aa; text-align: center; }
         .b-cell.center-zone { grid-column: 2 / 5; grid-row: 2 / 5; border: 3px dashed #ff80bf; }
-        .dice { font-size: 40px; cursor: pointer; }
-        .sidebar-area { flex: 1; display: flex; flex-direction: column; gap: 10px; }
-        .side-box { background: #fff5f7; border: 3px solid #ffb3d9; border-radius: 15px; padding: 15px; font-size: 11px; }
-        .action-btn { width: 100%; padding: 8px; border: none; border-radius: 8px; background: #ff59aa; color: white; font-weight: 900; cursor: pointer; margin-top: 5px; }
+        .sidebar { margin-top: 20px; padding: 15px; background: #fff5f7; border-radius: 15px; }
+        .btn { padding: 10px; background: #ff59aa; color: white; border: none; border-radius: 8px; cursor: pointer; }
     </style>
 </head>
 <body>
 
 <div class="arcade-container">
-    <div class="arcade-window">
-        <div class="main-layout">
-            <div class="board-grid" id="board-mesh"></div>
-            <div class="sidebar-area">
-                <div class="side-box">
-                    <strong>ID:</strong> <span id="my-peer-id">Generando...</span><br>
-                    <input type="text" id="rival-peer-id" placeholder="ID amigo" style="width:100%; margin:5px 0;">
-                    <button class="action-btn" onclick="conectar()">💎 Conectar</button>
-                </div>
-                <div class="side-box">
-                    <strong>Bancos:</strong><br>💖 Tú: <span id="dinero-mio">1000</span> | 💎 Amigo: <span id="dinero-amigo">1000</span>
-                    <button class="action-btn" onclick="comprar()">💰 Comprar Propiedad</button>
-                </div>
-                <div class="side-box" id="event-log" style="height: 100px; overflow-y: auto;">Esperando red...</div>
-            </div>
-        </div>
+    <div class="board-grid" id="board-mesh"></div>
+    <div class="sidebar">
+        <div><strong>ID:</strong> <span id="my-peer-id">Conectando...</span></div>
+        <input type="text" id="rival-id" placeholder="ID amigo">
+        <button class="btn" onclick="conectar()">Conectar</button>
+        <div id="status">Esperando...</div>
+        <div>💰 Dinero: <span id="dinero">1000</span> | <button onclick="comprar()">Comprar</button></div>
     </div>
 </div>
 
 <script>
     const peer = new Peer();
-    let conn, miPos = 0, dinero = 1000;
-    const mapa = ["SALIDA", "TÉ", "SUERTE", "BOUTIQUE", "HOME", "CAFÉ", "PARQUE", "POLICÍA", "SPA", "VILLA 1", "MALL", "JOYAS", "VILLA 2", "AEROPUERTO", "VILLA 3", "GYM", "VILLA 4", "SUERTE", "VILLA 5", "HOME"];
+    let conn, miTurno = true, dinero = 1000, miPos = 0;
+    const mapa = [
+        {n: "SALIDA", p: 0}, {n: "TÉ", p: 100}, {n: "SUERTE", p: 0}, {n: "BOUTIQUE", p: 200}, {n: "HOME", p: 0},
+        {n: "CAFÉ", p: 150}, {n: "PARQUE", p: 120}, {n: "POLICÍA", p: 0}, {n: "SPA", p: 250}, {n: "VILLA 1", p: 300},
+        {n: "MALL", p: 350}, {n: "JOYAS", p: 400}, {n: "VILLA 2", p: 200}, {n: "AEROPUERTO", p: 0}, {n: "VILLA 3", p: 220},
+        {n: "GYM", p: 180}, {n: "VILLA 4", p: 250}, {n: "SUERTE", p: 0}, {n: "VILLA 5", p: 300}, {n: "HOME", p: 0}
+    ];
 
-    peer.on('open', (id) => document.getElementById('my-peer-id').innerText = id);
-    
-    function buildBoard() {
-        const mesh = document.getElementById('board-mesh');
-        const center = document.createElement('div');
-        center.className = 'b-cell center-zone';
-        center.innerHTML = `<div class="dice" onclick="tirar()">🎲</div>`;
-        mesh.appendChild(center);
-        mapa.forEach((n, i) => {
-            const d = document.createElement('div');
-            d.className = 'b-cell'; d.id = 'cell-'+i; d.innerText = n;
-            mesh.appendChild(d);
+    peer.on('open', id => document.getElementById('my-peer-id').innerText = id);
+    peer.on('connection', c => { conn = c; setup(c); });
+
+    function conectar() {
+        conn = peer.connect(document.getElementById('rival-id').value);
+        setup(conn);
+    }
+
+    function setup(c) {
+        c.on('open', () => document.getElementById('status').innerText = "✅ Conectado");
+        c.on('data', d => {
+            if(d.type === 'MOVE') { mover(d.val); miTurno = true; }
         });
     }
 
-    function conectar() {
-        conn = peer.connect(document.getElementById('rival-peer-id').value);
-        conn.on('data', (d) => { if(d.type==='MOVE') mover(d.val); });
-    }
-
     function tirar() {
+        if(!miTurno || !conn) return alert("No es tu turno o no hay conexión");
         let val = Math.floor(Math.random()*6)+1;
         mover(val);
-        if(conn) conn.send({type:'MOVE', val:val});
+        conn.send({type: 'MOVE', val: val});
+        miTurno = false;
     }
 
     function mover(pasos) {
-        document.getElementById('cell-'+miPos).style.background = "white";
         miPos = (miPos + pasos) % mapa.length;
-        document.getElementById('cell-'+miPos).style.background = "#ffb3d9";
-        document.getElementById('event-log').innerHTML += `<br>Avanzaste ${pasos} casillas.`;
+        document.getElementById('status').innerText = "Cayó en: " + mapa[miPos].n;
     }
 
     function comprar() {
-        dinero -= 200;
-        document.getElementById('dinero-mio').innerText = dinero;
-        document.getElementById('event-log').innerHTML += `<br>¡Propiedad comprada!`;
+        let precio = mapa[miPos].p;
+        if(precio > 0 && dinero >= precio) {
+            dinero -= precio;
+            document.getElementById('dinero').innerText = dinero;
+            alert("Propiedad comprada");
+        } else alert("No puedes comprar esto");
     }
 
-    buildBoard();
+    function build() {
+        const m = document.getElementById('board-mesh');
+        const c = document.createElement('div');
+        c.className = 'b-cell center-zone';
+        c.innerHTML = `<div onclick="tirar()" style="font-size:30px; cursor:pointer">🎲</div>`;
+        m.appendChild(c);
+        mapa.forEach((obj, i) => {
+            const d = document.createElement('div');
+            d.className = 'b-cell'; d.id = 'cell-'+i;
+            d.innerHTML = `${obj.n}<br>${obj.p > 0 ? '$'+obj.p : ''}`;
+            m.appendChild(d);
+        });
+    }
+    build();
 </script>
 </body>
 </html>
