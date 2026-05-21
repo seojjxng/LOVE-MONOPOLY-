@@ -105,15 +105,16 @@
         esHost = true;
         peerConnections.push(c);
         let nuevoIdx = peerConnections.length;
+        // Se envía el índice al invitado para que sepa quién es
         c.send({type: 'INIT', idx: nuevoIdx});
-        log(jugadores[nuevoIdx] + " se ha unido. Bienvenido " + jugadores[nuevoIdx]);
+        log(jugadores[nuevoIdx] + " se ha unido.");
         c.on('data', d => {
             if (d.type === 'MOVE') {
                 procesarMovimiento(d);
                 peerConnections.forEach(con => con.send(d));
             } else if (d.type === 'CHAT') {
                 mostrarChat(d.user, d.msg);
-                peerConnections.forEach(con => con.send(d));
+                peerConnections.forEach(con => { if(con !== c) con.send(d); });
             }
         });
     });
@@ -121,7 +122,7 @@
     function conectar() {
         esHost = false; 
         conn = peer.connect(document.getElementById('peer-id').value);
-        conn.on('open', () => log("Conectando..."));
+        conn.on('open', () => log("Conectando a la sala..."));
         conn.on('data', d => {
             if (d.type === 'INIT') { 
                 miIndex = d.idx; 
@@ -134,7 +135,7 @@
 
     function enviarMensaje() {
         let msg = document.getElementById('chat-input').value;
-        let user = jugadores[miIndex];
+        let user = jugadores[miIndex]; // Usa el índice correcto según la conexión
         let data = {type: 'CHAT', user: user, msg: msg};
         mostrarChat(user, msg);
         if (esHost) peerConnections.forEach(c => c.send(data));
