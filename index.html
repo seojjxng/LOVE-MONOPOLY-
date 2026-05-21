@@ -7,20 +7,14 @@
     <style>
         body { background: #fff0f3; font-family: 'Montserrat', sans-serif; display: flex; justify-content: center; padding: 20px; color: #c71585; }
         .container { display: flex; gap: 25px; width: 950px; }
-        
         .board { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(5, 100px); gap: 8px; background: #ffccd5; padding: 15px; border-radius: 25px; }
         .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; }
         .center-zone { grid-column: 2 / 5; grid-row: 2 / 5; background: #fff5f7; border: 3px dashed #ff80bf; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; }
-        
         .sidebar { width: 320px; display: flex; flex-direction: column; gap: 20px; }
         .panel { background: #fff0f9; padding: 20px; border-radius: 20px; border: 2px solid #ffccd5; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        
         .btn { width: 70%; padding: 8px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin: 5px 0; font-size: 11px; }
-        
         #log { height: 180px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; }
         #log::-webkit-scrollbar { width: 8px; } #log::-webkit-scrollbar-track { background: #ffccd5; border-radius: 10px; } #log::-webkit-scrollbar-thumb { background: #c71585; border-radius: 10px; }
-        
-        /* Modal estilo Windows Rosa */
         #modal { display: none; position: fixed; top: 30%; left: 40%; width: 300px; background: #fff0f9; border: 3px solid #ff80bf; padding: 20px; border-radius: 15px; text-align: center; z-index: 100; box-shadow: 10px 10px 20px rgba(0,0,0,0.1); }
     </style>
 </head>
@@ -68,10 +62,21 @@
         {n: "GYM ($180)", p:180}, {n: "PRÉSTAMO", p:-200}, {n: "VIVIENDA", p:500}
     ];
 
-    function log(m, esRemoto = false) { 
+    function log(m) { 
         const l = document.getElementById('log'); 
         l.innerHTML += `<div>> ${m}</div>`; l.scrollTop = l.scrollHeight;
-        if(conn && !esRemoto) conn.send({type: 'LOG', msg: m});
+    }
+
+    // Lógica inteligente de turnos
+    function actualizarTurno(esMiTurno) {
+        miTurno = esMiTurno;
+        document.getElementById('turno-text').innerText = miTurno ? "¡ES TU TURNO!" : "ESPERANDO...";
+        // Solo loguea el mensaje si el estado es nuevo
+        if (miTurno) {
+            log("¡Te toca lanzar!");
+        } else {
+            log("Le toca a tu amorcito!");
+        }
     }
 
     function activarSuerte() {
@@ -81,21 +86,15 @@
         document.getElementById('dinero-mio').innerText = miDinero;
         document.getElementById('modal-text').innerText = "¡Ganaste $" + premio + "!";
         document.getElementById('modal').style.display = 'block';
-        log("¡Suerte! Ganaste $" + premio);
+        log("Suerte: Ganaste $" + premio);
         if(conn) conn.send({type: 'MONEY_UPDATE', amount: miDinero});
-    }
-
-    function cambiarTurno(estado) {
-        miTurno = estado;
-        document.getElementById('turno-text').innerText = miTurno ? "¡ES TU TURNO!" : "ESPERANDO...";
-        log(miTurno ? "¡Te toca lanzar!" : "Le toca a tu amorcito.");
     }
 
     function comprar() {
         let actual = mapa[miPos];
         if (actual.n === "SUERTE") { activarSuerte(); return; }
-        if (actual.n === "PRÉSTAMO") { miDinero += 200; log("¡Pediste préstamo!"); }
-        else if (actual.n === "VIVIENDA" && miDinero >= 500) { miDinero -= 500; log("¡Construiste casa!"); }
+        if (actual.n === "PRÉSTAMO") { miDinero += 200; log("Pediste un préstamo!"); }
+        else if (actual.n === "VIVIENDA" && miDinero >= 500) { miDinero -= 500; log("Construiste casa!"); }
         else if (actual.p > 0 && miDinero >= actual.p) { miDinero -= actual.p; log("Compraste " + actual.n); }
         else return;
         document.getElementById('dinero-mio').innerText = miDinero;
@@ -103,22 +102,19 @@
     }
 
     peer.on('open', id => document.getElementById('my-id').innerText = "Tu ID: " + id);
-    peer.on('connection', c => { conn = c; setup(); log("¡Conexión establecida!"); });
+    peer.on('connection', c => { conn = c; setup(); });
 
     function conectar() {
         conn = peer.connect(document.getElementById('peer-id').value);
         setup();
-        cambiarTurno(true);
-        log("¡Conexión establecida!");
+        actualizarTurno(true);
     }
 
     function setup() {
         conn.on('data', d => {
             if(d.type === 'MOVE') {
-                cambiarTurno(true);
+                actualizarTurno(true);
                 if(d.bloqueado) { bloqueado = true; log("¡Un turno sin jugar!"); }
-            } else if(d.type === 'LOG') {
-                log(d.msg, true);
             } else if(d.type === 'MONEY_UPDATE') {
                 amigoDinero = d.amount;
                 document.getElementById('dinero-amigo').innerText = amigoDinero;
@@ -128,7 +124,7 @@
 
     function tirarDado() {
         if(!miTurno) return;
-        if(bloqueado) { log("¡Turno perdido!"); bloqueado = false; cambiarTurno(false); return; }
+        if(bloqueado) { log("¡Turno perdido!"); bloqueado = false; actualizarTurno(false); return; }
         
         let val = Math.floor(Math.random()*6)+1;
         miPos = (miPos + val) % mapa.length;
@@ -136,7 +132,7 @@
         
         let b = (mapa[miPos].n === "POLICÍA");
         conn.send({type: 'MOVE', val: val, bloqueado: b});
-        cambiarTurno(false);
+        actualizarTurno(false);
     }
 
     const board = document.getElementById('board');
