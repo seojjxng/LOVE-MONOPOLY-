@@ -9,6 +9,8 @@
         .container { display: flex; gap: 25px; width: 950px; }
         .board { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(5, 100px); gap: 8px; background: #ffccd5; padding: 15px; border-radius: 25px; position: relative; }
         .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; cursor: pointer; }
+        .owned-host { background-color: #add8e6 !important; }
+        .owned-visitante { background-color: #ffb6c1 !important; }
         .token { width: 35px; height: 35px; position: absolute; z-index: 10; transition: all 0.5s ease; pointer-events: none; }
         .center-zone { grid-column: 2 / 5; grid-row: 2 / 5; background: #fff5f7; border: 3px dashed #ff80bf; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; }
         .sidebar { width: 320px; display: flex; flex-direction: column; gap: 20px; }
@@ -16,18 +18,22 @@
         .btn { width: 100%; padding: 10px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin: 5px 0; font-size: 12px; }
         .input-field { width: 93%; padding: 8px; margin: 5px 0; border: 1px solid #ffccd5; border-radius: 8px; }
         .dice-img { width: 60px; height: 60px; cursor: pointer; margin: 10px; }
-        #log { height: 150px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; }
-        #chat-log { height: 100px; overflow-y: auto; background: white; border: 1px solid #ffccd5; border-radius: 10px; padding: 10px; font-size: 12px; margin-bottom: 5px; }
+        #log { height: 300px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; }
+        #notification-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #fff0f9; border: 3px solid #ff80bf; padding: 20px; border-radius: 5px; z-index: 100; box-shadow: 5px 5px 0px #ffccd5; text-align: center; color: #c71585; }
     </style>
 </head>
 <body>
 
+<div id="notification-modal">
+    <div id="modal-title" style="font-weight:bold; font-size: 16px; margin-bottom: 5px;"></div>
+    <div id="modal-text" style="font-size: 12px; margin-bottom: 15px;"></div>
+    <button class="btn" onclick="document.getElementById('notification-modal').style.display='none'">OK</button>
+</div>
+
 <div class="container">
     <div class="board" id="board">
-        <img src="https://i.imgur.com/FGnMi8Y.png" id="p0" class="token">
-        <img src="https://i.imgur.com/fRZJfP8.png" id="p1" class="token">
-        <img src="https://i.imgur.com/u2AtssG.png" id="p2" class="token">
-        <img src="https://i.imgur.com/ekQp8WL.png" id="p3" class="token">
+        <img src="https://i.imgur.com/FGnMi8Y.png" id="p1" class="token">
+        <img src="https://i.imgur.com/fRZJfP8.png" id="p2" class="token">
         <div class="center-zone">
             <div id="turno-text" style="font-weight:bold;">ESPERANDO...</div>
             <img src="https://i.imgur.com/Nsafzb4.png" class="dice-img" onclick="tirarDado()">
@@ -40,14 +46,8 @@
         <div class="panel">
             <strong>Conexión</strong>
             <input type="text" id="peer-id" class="input-field" placeholder="ID amigo">
-            <button class="btn" onclick="iniciarConexion()">Conectar</button>
+            <button class="btn" onclick="iniciarComoInvitado()">Conectar</button>
             <div id="my-id" style="font-size: 11px; margin-top: 5px;">Iniciando...</div>
-        </div>
-        <div class="panel">
-            <strong>Chat</strong>
-            <div id="chat-log"></div>
-            <input type="text" id="chat-input" class="input-field" placeholder="Mensaje...">
-            <button class="btn" onclick="enviarChat()">Enviar</button>
         </div>
         <div class="panel"><strong>Historial</strong><div id="log"></div></div>
     </div>
@@ -55,85 +55,60 @@
 
 <script>
     const peer = new Peer();
-    let playerNames = ["Dog", "Horse", "Hat", "Car"];
-    let myIdx = 0, esHost = false, connections = [];
-    let miPos = [0,0,0,0], hostConn = null;
-
-    const mapa = [{n: "SALIDA"}, {n: "IGLESIA"}, {n: "?"}, {n: "BOUTIQUE"}, {n: "¡A LA CÁRCEL!"}, {n: "CHEONGDAM"}, {n: "GANGNAM"}, {n: "SEOCHO-GU"}, {n: "MAPO"}, {n: "INCHEON"}, {n: "JOYAS"}, {n: "CÁRCEL"}, {n: "VILLA 3"}, {n: "?"}, {n: "ARCA"}, {n: "BUKCHON"}];
+    let misConexiones = [], hostConn = null, miID = 0; // 0=Host, 1=Invitado
+    let miPos = 0, esHost = false;
+    let miDinero = 1000;
+    
+    const mapa = [{n: "SALIDA", p:0}, {n: "IGLESIA", p:100}, {n: "?", p:0}, {n: "BOUTIQUE", p:200}, {n: "¡A LA CÁRCEL!", p:0}, {n: "CHEONGDAM", p:500}, {n: "GANGNAM", p:520}, {n: "SEOCHO-GU", p:250}, {n: "MAPO", p:300}, {n: "INCHEON", p:350}, {n: "JOYAS", p:400}, {n: "CÁRCEL", p:0}, {n: "VILLA 3", p:220}, {n: "?", p:0}, {n: "ARCA", p:0}, {n: "BUKCHON", p:500}];
 
     peer.on('open', id => { document.getElementById('my-id').innerText = "ID: " + id; esHost = true; });
 
-    // Lógica única de conexión
+    // Lógica para que el host reciba invitados
     peer.on('connection', conn => {
-        let newIdx = connections.length + 1;
-        if(newIdx > 3) return;
-        connections.push(conn);
-        setupConn(conn);
-        conn.send({type: 'WELCOME', idx: newIdx, pos: miPos});
-        notifyAll({type: 'LOG', msg: playerNames[newIdx] + " se ha unido"});
+        let nuevoID = misConexiones.length + 1;
+        misConexiones.push({id: nuevoID, conn: conn});
+        conn.send({type: 'BIENVENIDO', id: nuevoID});
+        conn.on('data', d => manejarDatos(d));
+        log("Jugador " + nuevoID + " se ha unido.");
     });
 
-    function setupConn(conn) {
-        conn.on('data', d => {
-            if (d.type === 'WELCOME') { myIdx = d.idx; miPos = d.pos; log("Te has unido como " + playerNames[myIdx]); }
-            if (d.type === 'SYNC') { miPos = d.pos; actualizarFichas(); }
-            if (d.type === 'CHAT') { chatLog(d.user, d.msg); if(esHost) broadcast(d); }
-            if (d.type === 'MOVE_REQUEST') { 
-                miPos[d.idx] = d.val; 
-                broadcast({type: 'SYNC', pos: miPos}); 
-                actualizarFichas(); 
-            }
-            if (d.type === 'LOG') { log(d.msg); if(esHost) broadcast(d); }
-        });
-    }
-
-    function iniciarConexion() {
-        hostConn = peer.connect(document.getElementById('peer-id').value);
+    function iniciarComoInvitado() {
         esHost = false;
-        setupConn(hostConn);
+        hostConn = peer.connect(document.getElementById('peer-id').value);
+        hostConn.on('data', d => manejarDatos(d));
     }
 
-    function broadcast(d) { connections.forEach(c => c.send(d)); }
-    function notifyAll(d) { log(d.msg); broadcast(d); }
-
-    function sincronizarEstado() {
-        if(esHost) {
-            actualizarFichas();
-            broadcast({type: 'SYNC', pos: miPos});
-        } else {
-            hostConn.send({type: 'MOVE_REQUEST', idx: myIdx, val: miPos[myIdx]});
+    function manejarDatos(d) {
+        if(d.type === 'BIENVENIDO') miID = d.id;
+        if(d.type === 'MOVER') {
+            let ficha = document.getElementById(d.jugadorID === 0 ? 'p1' : 'p2');
+            let celda = document.getElementById('cell-' + d.pos);
+            if(ficha && celda) { ficha.style.left = celda.offsetLeft + 'px'; ficha.style.top = celda.offsetTop + 'px'; }
         }
-    }
-
-    function actualizarFichas() {
-        miPos.forEach((p, i) => {
-            const el = document.getElementById('p' + i);
-            const cell = document.getElementById('cell-' + p);
-            if(cell && el) { el.style.left = (cell.offsetLeft + 10) + 'px'; el.style.top = (cell.offsetTop + 10) + 'px'; }
-        });
+        // Si el host recibe algo, lo retransmite a otros
+        if(esHost) misConexiones.forEach(c => c.conn.send(d));
     }
 
     function tirarDado() {
-        miPos[myIdx] = (miPos[myIdx] + Math.floor(Math.random()*6)+1) % 16;
-        sincronizarEstado();
+        miPos = (miPos + Math.floor(Math.random()*6)+1) % 16;
+        let data = {type: 'MOVER', jugadorID: miID, pos: miPos};
+        // Actualizo la mía
+        manejarDatos(data);
+        // Envío a los demás
+        if(esHost) misConexiones.forEach(c => c.conn.send(data));
+        else hostConn.send(data);
     }
 
-    function enviarChat() {
-        let msg = document.getElementById('chat-input').value;
-        let d = {type: 'CHAT', user: playerNames[myIdx], msg: msg};
-        chatLog(playerNames[myIdx], msg);
-        if(esHost) broadcast(d); else hostConn.send(d);
-        document.getElementById('chat-input').value = "";
-    }
-
-    // Inicializar Tablero
+    function log(m) { const l = document.getElementById('log'); l.innerHTML += `<div>> ${m}</div>`; }
+    
+    // Generar tablero
     const board = document.getElementById('board');
     mapa.forEach((m, i) => {
         const d = document.createElement('div');
-        d.className = 'cell'; d.id = 'cell-' + i; d.innerHTML = m.n;
+        d.className = 'cell'; d.id = 'cell-' + i; d.innerHTML = `${m.n}<br>${m.p > 0 ? '$'+m.p : ''}`;
         board.appendChild(d);
     });
-    
+
     function comprar() {} function mejorar() {}
 </script>
 </body>
