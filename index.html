@@ -64,12 +64,18 @@
 <script>
     const peer = new Peer(undefined, { host: '0.peerjs.com', port: 443, secure: true });
     let conn;
-    let miPosicion = 0; // Posición inicial
-    let turno = true; // Control de turno básico
+    let miPosicion = 0;
+
+    // Log directo en la tablilla
+    function log(mensaje) {
+        const logBox = document.getElementById('event-log');
+        logBox.innerHTML += `<div style="margin-bottom:5px; border-bottom:1px solid #ffe6f2;">${mensaje}</div>`;
+        logBox.scrollTop = logBox.scrollHeight;
+    }
 
     peer.on('open', (id) => {
         document.getElementById('my-peer-id').innerText = id;
-        document.getElementById('event-log').innerText = "✅ Listo. Pásale este ID a tu amigo.";
+        log("✅ Listo. Esperando a tu amigo...");
         buildBoard();
     });
 
@@ -80,57 +86,57 @@
 
     function conectar() {
         const peerID = document.getElementById('rival-peer-id').value;
-        if (!peerID) return;
         conn = peer.connect(peerID);
         setupConnection();
     }
 
     function setupConnection() {
-        conn.on('open', () => {
-            document.getElementById('event-log').innerText = "💎 ¡Conexión establecida! Es tu turno.";
-        });
+        conn.on('open', () => log("💎 ¡Conexión establecida!"));
         conn.on('data', (data) => {
             if (data.type === 'MOVE') {
-                alert("Tu amigo se movió " + data.value + " espacios.");
+                log("🎮 Tu amigo avanzó " + data.value + " pasos.");
                 actualizarFicha(data.value);
             }
         });
     }
 
-    // Funcionalidad del dado
     function tirarDado() {
-        if (!conn || !conn.open) {
-            alert("¡Conéctate primero con un amigo!");
-            return;
-        }
+        if (!conn) return log("❌ Error: Conéctate primero.");
         const dado = Math.floor(Math.random() * 6) + 1;
-        alert("Sacaste un: " + dado);
-        
-        // Enviar movimiento al otro jugador
+        log("🎲 Sacaste un " + dado);
         conn.send({ type: 'MOVE', value: dado });
         actualizarFicha(dado);
     }
 
     function actualizarFicha(pasos) {
+        // Quitar ficha actual
+        document.getElementById(`cell-${miPosicion}`).classList.remove('jugador');
         miPosicion = (miPosicion + pasos) % 16;
-        document.querySelectorAll('.b-cell').forEach((cell, index) => {
-            cell.style.borderColor = "#ffccd5"; // Resetear color
-            if (index === miPosicion) cell.style.borderColor = "#ff0084"; // Resaltar posición
-        });
+        // Poner nueva posición
+        document.getElementById(`cell-${miPosicion}`).classList.add('jugador');
+    }
+
+    function comprarPropiedad(id) {
+        const celda = document.getElementById(`cell-${id}`);
+        celda.classList.add('comprada');
+        log("💖 ¡Compraste " + celda.innerText + "!");
     }
 
     function buildBoard() {
+        const nombres = ["HOME", "Villa 1", "Café", "Villa 2", "Parque", "Villa 3", "Police", "Villa 4", "Spa", "Villa 5", "Mall", "Villa 6", "Gym", "Villa 7", "Airport", "Villa 8"];
         const boardMesh = document.getElementById('board-mesh');
         boardMesh.innerHTML = '';
         const center = document.createElement('div');
         center.className = 'b-cell center-zone';
         center.innerHTML = `<div class="dice" onclick="tirarDado()">🎲</div>`;
         boardMesh.appendChild(center);
+        
         for(let i=0; i<16; i++) {
             const div = document.createElement('div');
             div.className = 'b-cell';
             div.id = `cell-${i}`;
-            div.innerText = `VILLA ${i + 1}`;
+            div.innerHTML = `<div>${nombres[i]}</div>`;
+            div.onclick = () => comprarPropiedad(i);
             boardMesh.appendChild(div);
         }
     }
