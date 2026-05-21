@@ -5,16 +5,29 @@
     <title>Cute Monopoly Town P2P</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { background: #fff0f3; font-family: 'Montserrat', sans-serif; display: flex; justify-content: center; padding: 20px; }
+        body { background: #fff0f3; font-family: 'Montserrat', sans-serif; display: flex; justify-content: center; padding: 20px; color: #c71585; }
         .container { display: flex; gap: 25px; width: 950px; }
+        
+        /* Tablero */
         .board { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(5, 100px); gap: 8px; background: #ffccd5; padding: 15px; border-radius: 25px; }
-        .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #ff59aa; text-align: center; }
-        .center-zone { grid-column: 2 / 5; grid-row: 2 / 5; background: #fff5f7; border: 3px dashed #ff80bf; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px; }
+        .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; }
+        .center-zone { grid-column: 2 / 5; grid-row: 2 / 5; background: #fff5f7; border: 3px dashed #ff80bf; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; }
+        
+        /* Sidebar y Paneles */
         .sidebar { width: 320px; display: flex; flex-direction: column; gap: 20px; }
-        .panel { background: white; padding: 20px; border-radius: 20px; border: 2px solid #ffccd5; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .panel { background: #fff0f9; padding: 20px; border-radius: 20px; border: 2px solid #ffccd5; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        
+        /* Botones y Scrollbar */
         .btn { width: 70%; padding: 8px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin: 5px 0; font-size: 11px; }
-        #log { height: 180px; overflow-y: auto; font-size: 11px; color: #555; padding-top: 10px; }
-        .banco-display { font-size: 12px; font-weight: bold; color: #ff59aa; margin-top: 10px; background: #fff; padding: 8px; border-radius: 5px; border: 1px solid #ffccd5; width: 100%; text-align: center; }
+        
+        #log { height: 180px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; }
+        
+        /* Scrollbar Rosa Oscuro */
+        #log::-webkit-scrollbar { width: 8px; }
+        #log::-webkit-scrollbar-track { background: #ffccd5; border-radius: 10px; }
+        #log::-webkit-scrollbar-thumb { background: #c71585; border-radius: 10px; }
+        
+        .banco-display { font-size: 12px; font-weight: bold; color: #c71585; margin-top: 10px; background: white; padding: 10px; border-radius: 10px; border: 1px solid #ffccd5; width: 100%; text-align: center; }
     </style>
 </head>
 <body>
@@ -22,7 +35,7 @@
 <div class="container">
     <div class="board" id="board">
         <div class="center-zone">
-            <div id="turno-text" style="margin-bottom: 5px; font-size: 10px;">ESPERANDO...</div>
+            <div id="turno-text" style="margin-bottom: 5px; font-size: 10px; font-weight: bold;">ESPERANDO...</div>
             <div onclick="tirarDado()" style="font-size: 40px; cursor: pointer;">🎲</div>
             <button class="btn" onclick="comprar()">COMPRAR</button>
             <div class="banco-display">
@@ -35,9 +48,9 @@
     <div class="sidebar">
         <div class="panel">
             <strong>ID de Conexión</strong>
-            <input type="text" id="peer-id" placeholder="ID amigo" style="width:100%; margin: 10px 0; padding: 8px;">
+            <input type="text" id="peer-id" placeholder="ID amigo" style="width:100%; margin: 10px 0; padding: 8px; border: 1px solid #ffccd5; border-radius: 8px;">
             <button class="btn" style="width:100%" onclick="conectar()">Conectar</button>
-            <div id="my-id" style="font-size: 10px;">Generando ID...</div>
+            <div id="my-id" style="font-size: 10px; margin-top: 5px;">Generando ID...</div>
         </div>
         <div class="panel">
             <strong>Historial</strong>
