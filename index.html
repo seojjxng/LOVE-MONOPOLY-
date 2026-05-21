@@ -26,7 +26,8 @@
 <body>
 
 <div id="notification-modal">
-    <div id="modal-text" style="font-weight:bold; margin-bottom: 10px;"></div>
+    <div id="modal-title" style="font-weight:bold; font-size: 16px; margin-bottom: 5px;"></div>
+    <div id="modal-text" style="font-size: 12px; margin-bottom: 15px;"></div>
     <button class="btn" onclick="document.getElementById('notification-modal').style.display='none'">OK</button>
 </div>
 
@@ -65,7 +66,7 @@
         {n: "VILLA 3", p:220, owner:null, up:0}, {n: "SUERTE", p:0, up:0}, {n: "COMUNIDAD", p:0, up:0}, {n: "VIVIENDA", p:500, owner:null, up:0}
     ];
 
-    function showModal(msg) { document.getElementById('modal-text').innerText = msg; document.getElementById('notification-modal').style.display = 'block'; }
+    function showModal(title, msg) { document.getElementById('modal-title').innerText = title; document.getElementById('modal-text').innerText = msg; document.getElementById('notification-modal').style.display = 'block'; }
     function log(m) { const l = document.getElementById('log'); l.innerHTML += `<div>> ${m}</div>`; l.scrollTop = l.scrollHeight; }
 
     function moverFichas() {
@@ -91,7 +92,9 @@
             if (actual.n === "SUERTE" || actual.n === "COMUNIDAD") {
                 let azar = Math.floor(Math.random() * 200) - 100;
                 miDinero += azar;
-                showModal(actual.n + ": " + (azar >= 0 ? "+" : "") + azar + "$");
+                let titulo = actual.n === "SUERTE" ? "SUERTE" : "ARCA COMUNAL";
+                let subtitulo = azar >= 0 ? "¡Has tenido suerte! Recibes $" + azar : "Un gasto imprevisto. Pierdes $" + Math.abs(azar);
+                showModal(titulo, subtitulo);
                 log(actual.n + ": " + azar + "$");
             } else if (actual.owner && actual.owner !== (esHost ? 'host' : 'visitante')) {
                 let alq = Math.floor(actual.p * (actual.up === 0 ? 0.1 : (actual.up === 1 ? 0.15 : 0.25)));
