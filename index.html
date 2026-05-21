@@ -6,7 +6,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <style>
-        body { background: #fff0f3; font-family: 'Montserrat', sans-serif; display: flex; justify-content: center; padding: 20px; color: #c71585; }
+        body { background: #fff0f3; font-family: 'Montserrat', sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; color: #c71585; }
         .container { display: flex; gap: 25px; width: 1000px; }
         .board { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(5, 100px); gap: 8px; background: #ffccd5; padding: 15px; border-radius: 25px; position: relative; }
         .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; }
@@ -19,6 +19,7 @@
         #log, #chat-log { height: 150px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; margin-bottom: 10px; }
         #modal { display: none; position: fixed; top: 20%; left: 35%; width: 300px; background: #ffe4e9; padding: 20px; border: 3px solid #ff80bf; border-radius: 15px; text-align: center; z-index: 999; box-shadow: 5px 5px 15px rgba(0,0,0,0.1); }
         #dado-valor { font-size: 24px; font-weight: bold; margin: 10px 0; }
+        #banco-container { margin-top: 10px; width: 570px; }
     </style>
 </head>
 <body>
@@ -35,7 +36,6 @@
             <img src="https://i.imgur.com/Nsafzb4.png" style="width:60px; cursor:pointer" onclick="tirarDado()">
             <div id="acciones"></div>
             <div>💖 $<span id="dinero-mio">1000</span></div>
-            <button class="btn" onclick="abrirBanco()">🏦 Banco</button>
         </div>
     </div>
     <div class="sidebar">
@@ -53,11 +53,15 @@
     </div>
 </div>
 
+<div id="banco-container">
+    <button class="btn" onclick="abrirBanco()">🏦 Solicitar Préstamo al Banco</button>
+</div>
+
 <div id="modal">
     <h3 id="modal-title" style="margin:0"></h3>
     <p id="modal-text" style="color:#c71585; font-weight:bold"></p>
     <div id="modal-extra"></div>
-    <button class="btn" onclick="document.getElementById('modal').style.display='none'">Aceptar</button>
+    <button class="btn" onclick="document.getElementById('modal').style.display='none'">Cerrar</button>
 </div>
 
 <script>
@@ -106,7 +110,7 @@
                     let desc = Math.min(bon * 0.5, j.deuda);
                     bon -= desc;
                     db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ deuda: j.deuda - desc });
-                    log("El banco descontó $" + desc + " de tu deuda.");
+                    log("El banco retuvo $" + desc + " de tu bonificación.");
                 }
                 db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d + bon);
             }
@@ -132,7 +136,11 @@
         [200, 450, 600, 700].forEach(m => {
             let b = document.createElement('button'); b.className = 'btn'; b.innerText = "Pedir $" + m;
             b.onclick = () => {
-                db.ref('salas/' + sala + '/jugadores/' + miIdx).transaction(j => { j.dinero += m; j.deuda += m; return j; });
+                db.ref('salas/' + sala + '/jugadores/' + miIdx).transaction(j => { 
+                    if(j) { j.dinero += m; j.deuda = (j.deuda || 0) + m; }
+                    return j; 
+                });
+                log(nombres[miIdx] + " solicitó un préstamo de $" + m);
                 document.getElementById('modal').style.display = 'none';
             };
             div.appendChild(b);
@@ -153,27 +161,25 @@
         } else if (mapa[pos].p > 0) {
             db.ref('salas/' + sala + '/propiedades/' + pos).once('value', s => {
                 if(!s.exists()) {
-                    if(dinero > 0) div.innerHTML = `<button class="btn" onclick="comprar(${pos})">Comprar $${mapa[pos].p}</button>`;
+                    if(dinero >= mapa[pos].p) div.innerHTML = `<button class="btn" onclick="comprar(${pos})">Comprar $${mapa[pos].p}</button>`;
                 } else if(s.val().owner == miIdx && s.val().nivel < 3) {
                     if(dinero >= 50) div.innerHTML = `<button class="btn" onclick="mejorar(${pos})">Mejorar $50</button>`;
                 } else if(s.val().owner != miIdx) {
                     let rent = Math.floor(mapa[pos].p * 0.2);
-                    if(miIdx != s.val().owner) {
-                        let jRef = db.ref('salas/' + sala + '/jugadores/' + miIdx);
-                        jRef.once('value', snap => {
-                            let j = snap.val();
-                            let pagado = rent;
-                            if(j.deuda > 0) {
-                                let desc = Math.min(rent * 0.5, j.deuda);
-                                pagado += desc;
-                                jRef.update({ deuda: j.deuda - desc });
-                                log("El banco descontó $" + desc + " de tu deuda.");
-                            }
-                            jRef.child('dinero').transaction(d => d - pagado);
-                            db.ref('salas/' + sala + '/jugadores/' + s.val().owner + '/dinero').transaction(d => d + rent);
-                            log("Pagaste $" + rent + " de alquiler a " + nombres[s.val().owner]);
-                        });
-                    }
+                    let jRef = db.ref('salas/' + sala + '/jugadores/' + miIdx);
+                    jRef.once('value', snap => {
+                        let j = snap.val();
+                        let pagado = rent;
+                        if(j.deuda > 0) {
+                            let desc = Math.min(rent * 0.5, j.deuda);
+                            pagado += desc;
+                            jRef.update({ deuda: j.deuda - desc });
+                            log("El banco descontó $" + desc + " de tu deuda.");
+                        }
+                        jRef.child('dinero').transaction(d => d - pagado);
+                        db.ref('salas/' + sala + '/jugadores/' + s.val().owner + '/dinero').transaction(d => d + rent);
+                        log("Pagaste $" + rent + " de alquiler a " + nombres[s.val().owner]);
+                    });
                 }
             });
         }
