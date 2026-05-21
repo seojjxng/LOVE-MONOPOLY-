@@ -64,10 +64,12 @@
 
     function unirse() {
         sala = document.getElementById('sala-id').value;
-        db.ref('salas/' + sala + '/jugadores').once('value', snap => {
+        const refJugadores = db.ref('salas/' + sala + '/jugadores');
+        refJugadores.once('value', snap => {
             miIdx = snap.numChildren();
             if(miIdx > 3) return;
-            db.ref('salas/' + sala + '/jugadores/' + miIdx).set({ pos: 0, dinero: 1000, activo: true });
+            // Inicializar jugador
+            refJugadores.child(miIdx).set({ pos: 0, dinero: 1000, activo: true });
             if(miIdx == 0) db.ref('salas/' + sala + '/turno').set(0);
             log(nombres[miIdx] + " entró a la sala.");
             sincronizar();
@@ -85,7 +87,8 @@
             if(pos < j.pos) j.dinero += 100;
             db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: pos, dinero: j.dinero });
             verificarCasilla(pos, j.dinero);
-            db.ref('salas/' + sala + '/turno').set((snap.val().turno + 1) % snap.val().jugadores.length);
+            let numJugadores = snap.val().jugadores.length;
+            db.ref('salas/' + sala + '/turno').set((snap.val().turno + 1) % numJugadores);
         });
     }
 
@@ -122,7 +125,7 @@
     }
 
     function mejorar(pos) {
-        db.ref('salas/' + sala + '/propiedades/' + pos + '/nivel').transaction(n => n + 1);
+        db.ref('salas/' + sala + '/propiedades/' + pos + '/nivel').transaction(n => (n || 1) + 1);
         db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d - 50);
         log(nombres[miIdx] + " mejoró su propiedad.");
     }
@@ -133,12 +136,13 @@
             if(!s || !s.jugadores) return;
             document.getElementById('dinero-mio').innerText = s.jugadores[miIdx].dinero;
             document.getElementById('turno-text').innerText = (s.turno == miIdx) ? "¡ES TU TURNO!" : "Esperando a " + (nombres[s.turno] || "Jugador");
+            
             s.jugadores.forEach((j, i) => {
                 let el = document.getElementById('p' + i);
-                el.style.display = 'block';
-                if(el && j.pos !== undefined) {
+                if(el) {
+                    el.style.display = 'block';
                     let cell = document.getElementById('cell-' + j.pos);
-                    if(cell) { el.style.left = (cell.offsetLeft + 20 + (i*5)) + 'px'; el.style.top = (cell.offsetTop + 20) + 'px'; }
+                    if(cell) { el.style.left = (cell.offsetLeft + 15 + (i*8)) + 'px'; el.style.top = (cell.offsetTop + 15) + 'px'; }
                 }
             });
             if(s.propiedades) {
