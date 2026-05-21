@@ -67,6 +67,11 @@
     const colores = ["#ffccd5", "#dcd0ff", "#c1e1c1", "#fff9c4"];
     const mapa = [{n:"SALIDA",p:0},{n:"IGLESIA",p:100},{n:"?",p:0},{n:"BOUTIQUE",p:200},{n:"A LA CÁRCEL",p:0},{n:"CHEONGDAM",p:500},{n:"GANGNAM",p:520},{n:"SEOCHO-GU",p:250},{n:"MAPO",p:300},{n:"INCHEON",p:350},{n:"JOYAS",p:400},{n:"CÁRCEL",p:0},{n:"VILLA 3",p:220},{n:"?",p:0},{n:"ARCA",p:0},{n:"BUKCHON",p:500}];
 
+    const eventos = [
+        {txt:"¡Ganaste la lotería!", m:200, g:true}, {txt:"¡Heredaste una fortuna!", m:300, g:true},
+        {txt:"Debes impuestos sobre la renta", m:150, g:false}, {txt:"Le debes al banco", m:250, g:false}
+    ];
+
     function log(txt) { document.getElementById('log').innerHTML += `<div>${txt}</div>`; }
 
     function unirse() {
@@ -94,13 +99,8 @@
             document.getElementById('dado-valor').innerText = val;
             let j = s.jugadores[miIdx];
             let pos = (j.pos + val) % mapa.length;
-            if(pos === 4) { 
-                db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: 11, enCarcel: true });
-                log(nombres[miIdx] + " en cárcel.");
-            } else {
-                if(pos < j.pos) j.dinero += 100;
-                db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: pos, dinero: j.dinero });
-            }
+            if(pos === 4) { db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: 11, enCarcel: true }); log(nombres[miIdx] + " en cárcel."); }
+            else { if(pos < j.pos) j.dinero += 100; db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: pos, dinero: j.dinero }); }
             verificarCasilla(pos, j.dinero);
             db.ref('salas/' + sala + '/turno').set((s.turno + 1) % s.jugadores.length);
         });
@@ -108,23 +108,29 @@
 
     function verificarCasilla(pos, dinero) {
         let div = document.getElementById('acciones'); div.innerHTML = "";
-        if(mapa[pos].p > 0) {
+        let tipo = mapa[pos].n;
+        if(tipo === "?" || tipo === "ARCA") {
+            let ev = eventos[Math.floor(Math.random()*eventos.length)];
+            db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').set(dinero + (ev.g ? ev.m : -ev.m));
+            document.getElementById('modal-text').innerText = ev.txt + (ev.g ? " +$" : " -$") + ev.m;
+            document.getElementById('modal').style.display = 'block';
+        } else if (mapa[pos].p > 0) {
             db.ref('salas/' + sala + '/propiedades/' + pos).once('value', s => {
                 if(!s.exists()) div.innerHTML = `<button class="btn" onclick="comprar(${pos})">Comprar $${mapa[pos].p}</button>`;
                 else if(s.val().owner == miIdx && s.val().nivel < 3) div.innerHTML = `<button class="btn" onclick="mejorar(${pos})">Mejorar $50</button>`;
+                else if(s.val().owner != miIdx) {
+                    let rent = Math.floor(mapa[pos].p * 0.2);
+                    db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d - rent);
+                    db.ref('salas/' + sala + '/jugadores/' + s.val().owner + '/dinero').transaction(d => d + rent);
+                    log("Pagaste $" + rent + " de alquiler a " + nombres[s.val().owner]);
+                }
             });
         }
     }
 
     function comprar(pos) {
-        db.ref('salas/' + sala + '/propiedades/' + pos).transaction(s => {
-            if(s) return;
-            return { owner: miIdx, nivel: 1 };
-        }, (err, committed) => {
-            if(committed) {
-                db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d - mapa[pos].p);
-                log(nombres[miIdx] + " compró " + mapa[pos].n);
-            }
+        db.ref('salas/' + sala + '/propiedades/' + pos).transaction(s => { if(s) return; return { owner: miIdx, nivel: 1 }; }, (err, committed) => {
+            if(committed) { db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d - mapa[pos].p); log(nombres[miIdx] + " compró " + mapa[pos].n); }
         });
     }
 
@@ -145,27 +151,18 @@
         db.ref('salas/' + sala).on('value', snap => {
             let s = snap.val(); if(!s) return;
             document.getElementById('dinero-mio').innerText = s.jugadores[miIdx].dinero;
+            document.getElementById('turno-text').innerText = "Turno de: " + nombres[s.turno];
             s.jugadores.forEach((j, i) => {
-                let el = document.getElementById('p' + i);
-                el.style.display = 'block';
+                let el = document.getElementById('p' + i); el.style.display = 'block';
                 let cell = document.getElementById('cell-' + j.pos);
                 if(cell) { el.style.left = (cell.offsetLeft + 15 + (i*8)) + 'px'; el.style.top = (cell.offsetTop + 15) + 'px'; }
             });
-            if(s.propiedades) Object.keys(s.propiedades).forEach(p => {
-                let cell = document.getElementById('cell-'+p);
-                if(cell) cell.style.backgroundColor = colores[s.propiedades[p].owner];
-            });
-            if(s.chat) {
-                let html = ""; Object.values(s.chat).forEach(c => html += `<div><b>${c.n}</b> [${c.t}]: ${c.m}</div>`);
-                document.getElementById('chat-log').innerHTML = html;
-            }
+            if(s.propiedades) Object.keys(s.propiedades).forEach(p => { let cell = document.getElementById('cell-'+p); if(cell) cell.style.backgroundColor = colores[s.propiedades[p].owner]; });
+            if(s.chat) { let html = ""; Object.values(s.chat).forEach(c => html += `<div><b>${c.n}</b> [${c.t}]: ${c.m}</div>`); document.getElementById('chat-log').innerHTML = html; }
         });
     }
 
-    mapa.forEach((m, i) => {
-        const d = document.createElement('div'); d.className = 'cell'; d.id = 'cell-' + i; d.innerHTML = `${m.n}<br>${m.p > 0 ? '$'+m.p : ''}`;
-        document.getElementById('board').appendChild(d);
-    });
+    mapa.forEach((m, i) => { const d = document.createElement('div'); d.className = 'cell'; d.id = 'cell-' + i; d.innerHTML = `${m.n}<br>${m.p > 0 ? '$'+m.p : ''}`; document.getElementById('board').appendChild(d); });
 </script>
 </body>
 </html>
