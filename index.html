@@ -48,48 +48,50 @@
 
 <script>
     const peer = new Peer();
-    let miIdx = -1, conexiones = [], hostConn = null, turnoActual = 0;
+    let miIdx = 0, hostConn = null, turnoActual = 0;
     let posiciones = [0, 0, 0, 0];
+    let listaConexiones = []; // Lista maestra para el Host
     const nombres = ["Dog", "Horse", "Hat", "Car"];
 
-    const mapa = [
-        {n: "SALIDA", p:0}, {n: "IGLESIA", p:100}, {n: "?", p:0}, {n: "BOUTIQUE", p:200}, 
-        {n: "¡CÁRCEL!", p:0}, {n: "CHEONGDAM", p:500}, {n: "GANGNAM", p:520}, {n: "SEOCHO", p:250}, 
-        {n: "MAPO", p:300}, {n: "INCHEON", p:350}, {n: "JOYAS", p:400}, {n: "CÁRCEL", p:0}, 
-        {n: "VILLA 3", p:220}, {n: "?", p:0}, {n: "ARCA", p:0}, {n: "BUKCHON", p:500}
-    ];
-
     function log(m) { const l = document.getElementById('log'); l.innerHTML += `<div>> ${m}</div>`; l.scrollTop = l.scrollHeight; }
-    
-    peer.on('open', id => { document.getElementById('my-id').innerText = "ID: " + id; miIdx = 0; });
 
+    peer.on('open', id => document.getElementById('my-id').innerText = "ID: " + id);
+
+    // LÓGICA DEL HOST
     peer.on('connection', conn => {
-        let nuevoIdx = conexiones.length + 1;
-        conexiones.push({idx: nuevoIdx, conn: conn});
-        conn.send({type: 'INIT', idx: nuevoIdx, pos: posiciones});
-        conn.on('data', d => manejarDatos(d));
-        log(nombres[nuevoIdx] + " se unió.");
+        let nuevoIdx = listaConexiones.length + 1;
+        listaConexiones.push({id: nuevoIdx, conn: conn});
+        
+        conn.on('data', data => {
+            // El Host recibe un movimiento y se lo reenvía a TODOS
+            if(data.type === 'MOVE') {
+                posiciones[data.idx] = data.pos;
+                turnoActual = (data.idx + 1) % (listaConexiones.length + 1);
+                
+                // Broadcast a todos
+                let payload = {type: 'UPDATE', pos: posiciones, turn: turnoActual};
+                listaConexiones.forEach(c => c.conn.send(payload));
+                actualizarJuego(payload);
+            }
+        });
+        
+        conn.send({type: 'WELCOME', idx: nuevoIdx});
+        log(nombres[nuevoIdx] + " se ha unido.");
     });
 
+    // LÓGICA DEL INVITADO
     function conectar() {
         hostConn = peer.connect(document.getElementById('peer-id').value);
-        hostConn.on('data', d => manejarDatos(d));
+        hostConn.on('data', data => {
+            if(data.type === 'WELCOME') miIdx = data.idx;
+            if(data.type === 'UPDATE') actualizarJuego(data);
+        });
     }
 
-    function manejarDatos(d) {
-        if(d.type === 'INIT') { miIdx = d.idx; posiciones = d.pos; moverFichas(); }
-        if(d.type === 'MOVE') {
-            posiciones[d.idx] = d.pos;
-            turnoActual = d.nextTurn; 
-            document.getElementById('turno-text').innerText = "Turno: " + nombres[turnoActual];
-            moverFichas();
-            log(nombres[d.idx] + " se movió a " + d.pos);
-            // El Host reenvía el movimiento a TODOS los invitados
-            if(miIdx === 0) conexiones.forEach(c => c.conn.send(d));
-        }
-    }
-
-    function moverFichas() {
+    function actualizarJuego(data) {
+        posiciones = data.pos;
+        turnoActual = data.turn;
+        document.getElementById('turno-text').innerText = "Turno: " + nombres[turnoActual];
         posiciones.forEach((pos, i) => {
             const el = document.getElementById('p' + i);
             const cell = document.getElementById('cell-' + pos);
@@ -99,21 +101,27 @@
 
     function tirarDado() {
         if(miIdx !== turnoActual) { log("Espera... turno de: " + nombres[turnoActual]); return; }
-        posiciones[miIdx] = (posiciones[miIdx] + Math.floor(Math.random()*6)+1) % mapa.length;
-        let siguienteTurno = (miIdx + 1) % conexiones.length + 1; 
-        if(miIdx === 0) siguienteTurno = 1;
         
-        let d = {type: 'MOVE', idx: miIdx, pos: posiciones[miIdx], nextTurn: siguienteTurno};
-        manejarDatos(d);
-        if(hostConn) hostConn.send(d);
+        let nuevaPos = (posiciones[miIdx] + Math.floor(Math.random()*6)+1) % 16;
+        let d = {type: 'MOVE', idx: miIdx, pos: nuevaPos};
+        
+        if(miIdx === 0) { // Soy el Host
+            posiciones[miIdx] = nuevaPos;
+            turnoActual = 1;
+            let payload = {type: 'UPDATE', pos: posiciones, turn: turnoActual};
+            listaConexiones.forEach(c => c.conn.send(payload));
+            actualizarJuego(payload);
+        } else { // Soy Invitado
+            hostConn.send(d);
+        }
     }
 
     const board = document.getElementById('board');
-    mapa.forEach((m, i) => {
+    for(let i=0; i<16; i++) {
         const d = document.createElement('div');
-        d.className = 'cell'; d.id = 'cell-' + i; d.innerHTML = `${m.n}<br>${m.p > 0 ? '$'+m.p : ''}`;
+        d.className = 'cell'; d.id = 'cell-' + i; d.innerHTML = "Casilla "+i;
         board.appendChild(d);
-    });
+    }
     function comprar() {} function mejorar() {}
 </script>
 </body>
