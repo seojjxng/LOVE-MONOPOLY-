@@ -108,15 +108,16 @@
             document.getElementById('dado-valor').innerText = val;
             let j = s.jugadores[miIdx];
             let nuevaPos = j.pos + val;
-            let pos = nuevaPos % mapa.length;
             
             if(nuevaPos >= mapa.length) { 
-                let bon = 100;
-                db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => (d || 0) + bon);
+                db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => (d || 0) + 100);
+                log("Pasaste por SALIDA: +$100");
             }
-
+            
+            let pos = nuevaPos % mapa.length;
             if(pos === 4) { 
                 db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: 11, enCarcel: true }); 
+                log(nombres[miIdx] + " fue arrestado.");
             } else { 
                 db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: pos }); 
                 verificarCasilla(pos, j.dinero);
@@ -138,6 +139,7 @@
                 });
                 document.getElementById('modal').style.display = 'none';
                 document.getElementById('contrato-modal').style.display = 'block';
+                log("Préstamo obtenido: +$" + m);
             };
             div.appendChild(b);
         });
@@ -154,7 +156,18 @@
             } else if(prop && prop.owner == miIdx) {
                 let costoMejora = mapa[pos].p + 50;
                 if(prop.nivel < 3) div.innerHTML = `<button class="btn" onclick="mejorar(${pos}, ${costoMejora})">Mejorar $${costoMejora}</button>`;
-                else if(prop.nivel == 3) div.innerHTML = `<button class="btn" disabled>Max Nivel</button>`;
+            } else if(prop && prop.owner != miIdx) {
+                let renta = Math.floor(mapa[pos].p * (prop.nivel == 3 ? 0.5 : 0.2));
+                db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d - renta);
+                db.ref('salas/' + sala + '/jugadores/' + prop.owner + '/dinero').transaction(d => (d || 0) + renta);
+                log("Pagaste $" + renta + " de alquiler a " + nombres[prop.owner]);
+            } else if(mapa[pos].n == "?" || mapa[pos].n == "ARCA") {
+                let ev = eventos[Math.floor(Math.random()*eventos.length)];
+                db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => (d || 0) + (ev.g ? ev.m : -ev.m));
+                document.getElementById('modal-title').innerText = mapa[pos].n;
+                document.getElementById('modal-text').innerText = ev.txt + " ($" + ev.m + ")";
+                document.getElementById('modal').style.display = 'block';
+                log(mapa[pos].n + ": " + ev.txt + " ($" + ev.m + ")");
             }
         });
     }
