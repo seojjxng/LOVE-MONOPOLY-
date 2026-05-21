@@ -89,7 +89,7 @@
         if(d.type === 'INIT') miIdx = d.idx;
         if(d.type === 'MOVE') {
             posiciones[d.idx] = d.pos;
-            turnoActual = (d.idx + 1) % 4;
+            turnoActual = d.nextTurn; 
             document.getElementById('turno-text').innerText = "Turno: " + nombres[turnoActual];
             moverFichas();
             log(nombres[d.idx] + " se movió a " + d.pos);
@@ -106,9 +106,12 @@
     }
 
     function tirarDado() {
-        if(miIdx !== turnoActual) { log("No es tu turno."); return; }
+        if(miIdx !== turnoActual) { log("Espera... turno de: " + nombres[turnoActual]); return; }
+        
         posiciones[miIdx] = (posiciones[miIdx] + Math.floor(Math.random()*6)+1) % mapa.length;
-        let d = {type: 'MOVE', idx: miIdx, pos: posiciones[miIdx]};
+        let siguienteTurno = (miIdx + 1) % 4;
+        let d = {type: 'MOVE', idx: miIdx, pos: posiciones[miIdx], nextTurn: siguienteTurno};
+        
         manejarDatos(d);
         if(hostConn) hostConn.send(d);
     }
