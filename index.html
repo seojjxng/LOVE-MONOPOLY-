@@ -38,8 +38,8 @@
             <div id="acciones"></div>
             <div>💖 $<span id="dinero-mio">1000</span></div>
         </div>
-        <div id="banco-container">
-            <button class="btn" style="width: 200px" onclick="abrirBanco()">🏦 Solicitar Préstamo</button>
+        <div id="banco-container" style="padding: 10px; gap: 10px;">
+            <button class="btn" onclick="abrirBanco()">🏦 Solicitar Préstamo</button>
             <button class="btn" onclick="verSaldos()">👥 Ver Saldos</button>
         </div>
     </div>
@@ -109,11 +109,11 @@
             // Lógica de Salida: Si la nueva posición es menor, pasamos por salida
             if(nuevaPos < j.pos) {
                 db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => (d || 0) + 100);
-                log(nombres[miIdx] + " pasó por salida y cobró $100");
+                log(nombres[miIdx] + " pasó por SALIDA y cobró $100");
             }
             
             db.ref('salas/' + sala + '/jugadores/' + miIdx + '/pos').set(nuevaPos);
-            verificarCasilla(nuevaPos);
+            verificarCasilla(nuevaPos, j.dinero);
             db.ref('salas/' + sala + '/turno').set((s.turno + 1) % s.jugadores.length);
         });
     }
