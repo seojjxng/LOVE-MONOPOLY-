@@ -101,7 +101,6 @@
         let p = mapa[pos];
         let extra = document.getElementById('modal-extra'); extra.innerHTML = "";
         if (p.n === "A LA CÁRCEL" || p.n === "CÁRCEL") {
-    // Ponemos enCarcel en 1 y turnosCarcel en 1 (el turno actual de espera)
     db.ref('salas/'+sala+'/jugadores/'+miIdx).update({pos: 11, enCarcel: 1, turnosCarcel: 1});
             log(nombres[miIdx] + " terminó en la cárcel.");
             document.getElementById('modal-title').innerText = "Cárcel";
@@ -112,11 +111,18 @@
         }
         if (p.n === "?" || p.n === "ARCA") { ejecutarEvento(); return; }
         if (p.n === "IMPUESTOS") {
-            let monto = 200;
-            db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => Number(d) - monto);
-            log(nombres[miIdx] + " pagó $" + monto + " de impuestos.");
+            let situaciones = [
+                {m: "Declaración de ingresos: Pagas $200.", v: 200},
+                {m: "Tasa de servicio público: Pagas $150.", v: 150},
+                {m: "Contribución a la ciudad: Pagas $180.", v: 180},
+                {m: "Multa por exceso de velocidad: Pagas $120.", v: 120},
+                {m: "Recargo por lujo: Pagas $250.", v: 250}
+            ];
+            let sit = situaciones[Math.floor(Math.random()*situaciones.length)];
+            db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => Number(d) - sit.v);
+            log(nombres[miIdx] + " " + sit.m);
             document.getElementById('modal-title').innerText = "Impuestos";
-            document.getElementById('modal-text').innerText = "Pagaste $200.";
+            document.getElementById('modal-text').innerText = sit.m;
             document.getElementById('modal').style.display = 'block';
             return;
         }
@@ -164,10 +170,24 @@
     }
 
     function ejecutarEvento() {
-        let evs = [{t:"Lotería", m:"¡Ganaste $300!", v:300}, {t:"Gas", m:"Pagaste gas -$100", v:-100}];
-        let e = evs[Math.floor(Math.random()*evs.length)];
+        let p = mapa[Number(document.getElementById('p'+miIdx).dataset.pos || 0)];
+        let esArca = (p && p.n === "ARCA");
+        let eventos = esArca ? [
+            {t:"Arca Comunal", m:"Donación a la comunidad: Ganas $100.", v:100},
+            {t:"Arca Comunal", m:"Reembolso de impuestos: Ganas $200.", v:200},
+            {t:"Arca Comunal", m:"Venta de pasteles benéficos: Ganas $150.", v:150},
+            {t:"Arca Comunal", m:"Premio por voluntariado: Ganas $120.", v:120},
+            {t:"Arca Comunal", m:"Error bancario a tu favor: Ganas $250.", v:250}
+        ] : [
+            {t:"?", m:"¡Encontraste dinero perdido! Ganas $80.", v:80},
+            {t:"?", m:"Multa por estacionamiento prohibido: Pierdes $50.", v:-50},
+            {t:"?", m:"¡Promoción en la Boutique! Ganas $100.", v:100},
+            {t:"?", m:"Gastos de mantenimiento inesperados: Pierdes $70.", v:-70},
+            {t:"?", m:"¡Ganaste una rifa de belleza! Ganas $130.", v:130}
+        ];
+        let e = eventos[Math.floor(Math.random()*eventos.length)];
         db.ref('salas/'+sala+'/jugadores/'+miIdx+'/dinero').transaction(d => Number(d) + e.v);
-        log(nombres[miIdx] + " evento: " + e.t); 
+        log(nombres[miIdx] + " " + e.t + ": " + e.m); 
         document.getElementById('modal-title').innerText = e.t; 
         document.getElementById('modal-text').innerText = e.m; 
         document.getElementById('modal').style.display = 'block';
@@ -203,7 +223,6 @@
         db.ref('salas/' + sala).once('value', snap => {
             let s = snap.val(); if(s.turno !== miIdx) return;
             if(s.jugadores[miIdx].enCarcel === 1) { 
-                // Liberamos al jugador para que en su próximo turno pueda tirar
                 db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ enCarcel: 0 });
                 log(nombres[miIdx] + " cumplió su condena y sale de la cárcel.");
                 pasarTurno();
@@ -237,6 +256,7 @@
             let el = document.getElementById('p' + i); el.style.display = 'block'; 
             let cell = document.getElementById('cell-' + j.pos); 
             el.style.left = (cell.offsetLeft + 30) + 'px'; el.style.top = (cell.offsetTop + 30) + 'px'; 
+            el.dataset.pos = j.pos;
         });
         if(s.propiedades) { Object.keys(s.propiedades).forEach(pos => { document.getElementById('cell-' + pos).style.backgroundColor = colores[s.propiedades[pos].owner]; }); }
         if(s.chat) { let h = ""; Object.values(s.chat).forEach(c => h += "<b>"+c.n+":</b> "+c.m+"<br>"); document.getElementById('chat-log').innerHTML = h; }
