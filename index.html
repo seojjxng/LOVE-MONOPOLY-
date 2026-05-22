@@ -75,6 +75,20 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
+    // Coordenadas exactas para evitar saltos del grid
+
+    const coords = [
+
+        {x: 485, y: 580}, {x: 377, y: 580}, {x: 269, y: 580}, {x: 161, y: 580}, {x: 53, y: 580},
+
+        {x: 53, y: 472}, {x: 53, y: 364}, {x: 53, y: 256}, {x: 53, y: 148},
+
+        {x: 53, y: 40}, {x: 161, y: 40}, {x: 269, y: 40}, {x: 377, y: 40}, {x: 485, y: 40},
+
+        {x: 485, y: 148}, {x: 485, y: 256}
+
+    ];
+
     let miIdx = -1, sala = "";
     const nombres = ["Dog", "Horse", "Hat", "Car"];
     const colores = ["#f590b0", "#dcd0ff", "#c1e1c1", "#f5eb98"];
