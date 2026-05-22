@@ -40,7 +40,7 @@
         </div>
         <div id="banco-container">
             <button class="btn" style="width: 200px" onclick="abrirBanco()">🏦 Solicitar Préstamo</button>
-            <button class="btn" style="width: 200px" onclick="verSaldos()">👥 Ver Saldos</button>
+            <button class="btn" onclick="verSaldos()">👥 Ver Saldos</button>
         </div>
     </div>
     <div class="sidebar">
@@ -83,7 +83,7 @@
         db.ref('salas/' + sala + '/jugadores').once('value', snap => {
             miIdx = snap.numChildren();
             if(miIdx > 3) return;
-            db.ref('salas/' + sala + '/jugadores/' + miIdx).set({ pos: 0, dinero: 1000, turnosCarcel: 0, deuda: 0 });
+            db.ref('salas/' + sala + '/jugadores/' + miIdx).set({ pos: 0, dinero: 1000, turnosCarcel: 0 });
             if(miIdx == 0) db.ref('salas/' + sala + '/turno').set(0);
             sincronizar();
         });
@@ -106,42 +106,19 @@
             document.getElementById('dado-valor').innerText = val;
             let nuevaPos = (j.pos + val) % mapa.length;
             
+            // Lógica de Salida: Si la nueva posición es menor, pasamos por salida
             if(nuevaPos < j.pos) {
-                db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => (d || 0) + 200);
+                db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => (d || 0) + 100);
+                log(nombres[miIdx] + " pasó por salida y cobró $100");
             }
             
             db.ref('salas/' + sala + '/jugadores/' + miIdx + '/pos').set(nuevaPos);
-            verificarCasilla(nuevaPos, j.dinero);
+            verificarCasilla(nuevaPos);
             db.ref('salas/' + sala + '/turno').set((s.turno + 1) % s.jugadores.length);
         });
     }
 
-    function abrirBanco() {
-        document.getElementById('modal-title').innerText = "Banco";
-        let div = document.getElementById('modal-extra'); div.innerHTML = "";
-        [200, 450, 600, 700].forEach(m => {
-            let b = document.createElement('button'); b.className = 'btn'; b.innerText = "Pedir $" + m;
-            b.onclick = () => {
-                db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d + m);
-                document.getElementById('modal').style.display = 'none';
-                log(nombres[miIdx] + " obtuvo un préstamo de $" + m);
-            };
-            div.appendChild(b);
-        });
-        document.getElementById('modal').style.display = 'block';
-    }
-    
-    function verSaldos() {
-        db.ref('salas/'+sala+'/jugadores').once('value', s => {
-            let txt = ""; s.val().forEach((j, i) => txt += `${nombres[i]}: $${j.dinero}<br>`);
-            document.getElementById('modal-title').innerText = "Saldos";
-            document.getElementById('modal-text').innerHTML = txt;
-            document.getElementById('modal-extra').innerHTML = "";
-            document.getElementById('modal').style.display = 'block';
-        });
-    }
-
-    function verificarCasilla(pos, dinero) {
+    function verificarCasilla(pos) {
         let div = document.getElementById('acciones'); div.innerHTML = "";
         let m = mapa[pos];
 
@@ -174,6 +151,32 @@
                 db.ref('salas/' + sala + '/jugadores/' + prop.owner + '/dinero').transaction(d => d + renta);
                 log(nombres[miIdx] + " pagó renta de $" + renta);
             }
+        });
+    }
+
+    // ... (El resto de las funciones: abrirBanco, verSaldos, showModal, comprar, sincronizar, enviarChat se mantienen igual)
+    function abrirBanco() {
+        document.getElementById('modal-title').innerText = "Banco";
+        let div = document.getElementById('modal-extra'); div.innerHTML = "";
+        [200, 450, 600, 700].forEach(m => {
+            let b = document.createElement('button'); b.className = 'btn'; b.innerText = "Pedir $" + m;
+            b.onclick = () => {
+                db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d + m);
+                document.getElementById('modal').style.display = 'none';
+                log(nombres[miIdx] + " obtuvo un préstamo de $" + m);
+            };
+            div.appendChild(b);
+        });
+        document.getElementById('modal').style.display = 'block';
+    }
+    
+    function verSaldos() {
+        db.ref('salas/'+sala+'/jugadores').once('value', s => {
+            let txt = ""; s.val().forEach((j, i) => txt += `${nombres[i]}: $${j.dinero}<br>`);
+            document.getElementById('modal-title').innerText = "Saldos";
+            document.getElementById('modal-text').innerHTML = txt;
+            document.getElementById('modal-extra').innerHTML = "";
+            document.getElementById('modal').style.display = 'block';
         });
     }
 
