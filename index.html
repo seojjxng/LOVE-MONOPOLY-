@@ -1,4 +1,5 @@
-<!DOCTYPE html><html lang="es"><head>
+<!DOCTYPE html>
+<html lang="es"><head>
     <meta charset="UTF-8">
     <title>Monopoly Naeun Town</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -22,7 +23,6 @@
         #log { height: 125px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; margin-bottom: 10px; }
         #chat-log { height: 125px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; margin-bottom: 10px; }
         #modal { display: none; position: fixed; top: 20%; left: 35%; width: 300px; background: #ffe4e9; padding: 20px; border: 3px solid #ff80bf; border-radius: 15px; text-align: center; z-index: 999; }
-        /* Estilo tarjeta propiedad */
         .card-property { border: 2px solid #c71585; padding: 10px; border-radius: 5px; background: white; margin-bottom: 10px; }
         .card-header { background: #ff80bf; color: white; padding: 5px; font-weight: bold; margin-bottom: 10px; }
         #banco-container { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; background: #fff0f9; border: 2px solid #ffccd5; border-radius: 20px; padding: 15px; gap: 10px; }
@@ -199,13 +199,30 @@
                 htmlCard += `<p>Dueño: <b>${nombres[prop.owner]}</b></p><p>Alquiler actual: <b>$${alquiler}</b></p>`;
                 if(esCaida) {
                     alquilerPendiente = { monto: alquiler, dueño: prop.owner };
-                    extra.innerHTML = `<button class="btn" onclick="procesarPago(${miIdx}, ${prop.owner}, ${alquiler})">Pagar Alquiler</button>`;
+                    extra.innerHTML = `
+                        <button class="btn" onclick="procesarPago(${miIdx}, ${prop.owner}, ${alquiler})">Pagar Alquiler</button>
+                        <button class="btn" style="background:#ff80bf" onclick="intentarEvasion(${miIdx}, ${prop.owner}, ${alquiler})">Intentar Evasión (30%)</button>
+                    `;
                 }
             }
             htmlCard += `</div>`;
             document.getElementById('modal-text').innerHTML = htmlCard;
             document.getElementById('modal').style.display = 'block';
         });
+    }
+
+    // NUEVA FUNCIÓN PARA EVASIÓN
+    function intentarEvasion(d, a, m) {
+        let exito = Math.random() < 0.30;
+        if(exito) {
+            let montoFinal = Math.floor(m / 2);
+            procesarPago(d, a, montoFinal, true);
+            log(nombres[d] + " intentó una evasión de pago de alquiler y tuvo éxito, solo pagará la mitad del porcentaje original ($" + montoFinal + ")");
+        } else {
+            let montoFinal = m + 50;
+            procesarPago(d, a, montoFinal, false);
+            log(nombres[d] + " intentó una evasión de pago de alquiler y no tuvo éxito, tendrá que pagar el porcentaje original +$50 extra por evasión ($" + montoFinal + ")");
+        }
     }
 
     function manejarCasilla(pos) {
@@ -228,7 +245,6 @@
                 {m: "Ofrenda para los niños de la iglesia: Pagas $150.", v: 150},
                 {m: "Contribución a la ciudad: Pagas $180.", v: 180},
                 {m: "Multa por exceso de velocidad: Pagas $120.", v: 120},
-                {m: "Recargo por evasión de impuestos: Pagas $500.", v: 500},
                 {m: "Recargo por lujo: Pagas $250.", v: 250},
                 {m: "Cuota de mantenimiento urbano: Pagas $100.", v: 100}
             ];
@@ -308,7 +324,7 @@
         document.getElementById('modal').style.display = 'block';
     }
 
-    function procesarPago(d, a, m) {
+    function procesarPago(d, a, m, esEvasionLog = false) {
         db.ref('salas/' + sala + '/jugadores').transaction(j => {
             if(!j) return;
             j[d].dinero = Number(j[d].dinero) - m;
@@ -318,7 +334,7 @@
             }, 500);
             return j;
         });
-        log(nombres[d] + " pagó $" + m + " a " + nombres[a]);
+        if(!esEvasionLog) log(nombres[d] + " pagó $" + m + " a " + nombres[a]);
         alquilerPendiente = null;
         document.getElementById('modal').style.display = 'none';
     }
@@ -331,14 +347,6 @@
         db.ref('salas/' + sala).once('value', snap => {
             let s = snap.val(); 
             if(s.turno !== miIdx || s.jugadores[miIdx].enCarcel === 1) return;
-            
-            // Lógica de fallo (20% probabilidad)
-            if (Math.random() < 0.20) {
-                log(nombres[miIdx] + " tuvo un fallo técnico al tirar y pierde el turno.");
-                pasarTurno();
-                return;
-            }
-
             let dado = Math.floor(Math.random()*6)+1;
             document.getElementById('dado-valor').innerText = dado;
             
