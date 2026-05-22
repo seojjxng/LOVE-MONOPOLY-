@@ -79,15 +79,19 @@
     function cerrarModal() { document.getElementById('modal').style.display = 'none'; }
 
     function unirse() {
-        sala = document.getElementById('sala-id').value;
-        db.ref('salas/'+sala+'/jugadores').once('value', snap => {
+        sala = document.getElementById('sala-id').value.trim();
+        if (!sala) return;
+        const ref = db.ref('salas/'+sala+'/jugadores');
+        ref.once('value', snap => {
             miIdx = snap.numChildren();
-            db.ref('salas/'+sala+'/jugadores/'+miIdx).set({pos:0, dinero:1000, deuda:0, exentoSalida:false});
-            sincronizar();
+            ref.child(miIdx).set({pos:0, dinero:1000, deuda:0, exentoSalida:false}).then(() => {
+                sincronizar();
+            });
         });
     }
 
     function enviarChat() {
+        if (!sala) return;
         let msg = document.getElementById('chat-msg').value;
         db.ref('salas/'+sala+'/chat').push({n: "Jugador "+miIdx, m: msg});
         document.getElementById('chat-msg').value = "";
@@ -108,6 +112,7 @@
     }
 
     function tirarDado() {
+        if (!sala) return;
         db.ref('salas/'+sala).once('value', snap => {
             let s = snap.val();
             let posActual = s.jugadores[miIdx].pos;
@@ -139,7 +144,7 @@
     function sincronizar() {
         db.ref('salas/'+sala).on('value', snap => {
             let s = snap.val();
-            if(!s) return;
+            if(!s || !s.jugadores || !s.jugadores[miIdx]) return;
             document.getElementById('dinero-mio').innerText = s.jugadores[miIdx].dinero;
             let logs = ""; if(s.log) Object.values(s.log).forEach(l => logs += l + "<br>"); document.getElementById('log').innerHTML = logs;
             let chat = ""; if(s.chat) Object.values(s.chat).forEach(c => chat += "<b>"+c.n+":</b> "+c.m+"<br>"); document.getElementById('chat-log').innerHTML = chat;
