@@ -94,7 +94,7 @@
         document.getElementById('btn-unirse').disabled = true;
         db.ref('salas/' + sala + '/jugadores').once('value', snap => { 
             miIdx = snap.numChildren(); 
-            db.ref('salas/' + sala + '/jugadores/' + miIdx).set({ pos: 0, dinero: 1000, deuda: 0, pausasDeuda: 0, enCarcel: 0 }); 
+            db.ref('salas/' + sala + '/jugadores/' + miIdx).set({ pos: 0, dinero: 1000, deuda: 0, pausasDeuda: 0, enCarcel: 0, tienePrestamo: false }); 
             if(miIdx == 0) db.ref('salas/' + sala + '/turno').set(0); 
             db.ref('salas/' + sala + '/chat').push({ n: "Sistema", m: nombres[miIdx] + " ha entrado a la sala." });
             sincronizar(); 
@@ -274,19 +274,28 @@
     }
 
     function abrirBanco() { 
-        document.getElementById('modal-title').innerText = "Préstamo"; 
-        let div = document.getElementById('modal-extra'); div.innerHTML = ""; 
-        [200, 500, 650, 800, 900].forEach(m => { 
-            let b = document.createElement('button'); 
-            b.className = 'btn'; 
-            b.innerText = "Pedir $"+m; 
-            b.onclick = () => { 
-                db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => Number(d) + m); 
-                document.getElementById('modal').style.display = 'none'; 
-            }; 
-            div.appendChild(b); 
-        }); 
-        document.getElementById('modal').style.display = 'block'; 
+        db.ref('salas/' + sala + '/jugadores/' + miIdx).once('value', snap => {
+            if (snap.val().tienePrestamo) {
+                document.getElementById('modal-title').innerText = "Error";
+                document.getElementById('modal-text').innerText = "Ya tienes un préstamo activo. Debes pagarlo antes de pedir otro.";
+                document.getElementById('modal-extra').innerHTML = "";
+            } else {
+                document.getElementById('modal-title').innerText = "Préstamo"; 
+                let div = document.getElementById('modal-extra'); div.innerHTML = ""; 
+                [200, 500, 650, 800, 900].forEach(m => { 
+                    let b = document.createElement('button'); 
+                    b.className = 'btn'; 
+                    b.innerText = "Pedir $"+m; 
+                    b.onclick = () => { 
+                        db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ dinero: firebase.database.ServerValue.increment(m), tienePrestamo: true });
+                        log(nombres[miIdx] + " solicitó un préstamo de $" + m);
+                        document.getElementById('modal').style.display = 'none'; 
+                    }; 
+                    div.appendChild(b); 
+                });
+            }
+            document.getElementById('modal').style.display = 'block'; 
+        });
     }
     
     function verSaldos() { 
@@ -294,7 +303,8 @@
             let txt = ""; 
             snap.forEach(c => {
                 let idx = parseInt(c.key);
-                txt += nombres[idx] + ": $" + c.val().dinero + "<br>";
+                let datos = c.val();
+                txt += nombres[idx] + ": $" + datos.dinero + (datos.tienePrestamo ? " (Préstamo Activo)" : "") + "<br>";
             }); 
             document.getElementById('modal-title').innerText = "Saldos de todos"; 
             document.getElementById('modal-text').innerHTML = txt; 
