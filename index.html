@@ -7,13 +7,19 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <style>
         body { background: #fff0f3; font-family: 'Montserrat', sans-serif; display: flex; justify-content: center; padding: 20px; color: #c71585; }
-        .container { display: flex; gap: 25px; }
+        .container { display: flex; gap: 25px; width: 1000px; }
+        .game-column { display: flex; flex-direction: column; gap: 15px; }
         .board { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(5, 100px); gap: 8px; background: #ffccd5; padding: 15px; border-radius: 25px; position: relative; }
         .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; cursor: pointer; }
         .token { width: 35px; height: 35px; position: absolute; z-index: 10; transition: all 0.5s ease; pointer-events: none; }
-        .center-zone { grid-column: 2 / 5; grid-row: 2 / 5; background: #fff5f7; border: 3px dashed #ff80bf; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .btn { width: 100%; padding: 10px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin: 5px 0; }
+        .center-zone { grid-column: 2 / 5; grid-row: 2 / 5; background: #fff5f7; border: 3px dashed #ff80bf; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; }
+        .sidebar { width: 320px; display: flex; flex-direction: column; gap: 20px; }
+        .panel { background: #fff0f9; padding: 20px; border-radius: 20px; border: 2px solid #ffccd5; }
+        .btn { width: 100%; padding: 10px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin: 5px 0; font-size: 12px; }
+        .input-field { width: 93%; padding: 8px; margin: 5px 0; border: 1px solid #ffccd5; border-radius: 8px; }
+        #log, #chat-log { height: 150px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; margin-bottom: 10px; }
         #modal { display: none; position: fixed; top: 20%; left: 35%; width: 300px; background: #ffe4e9; padding: 20px; border: 3px solid #ff80bf; border-radius: 15px; text-align: center; z-index: 999; }
+        #banco-container { display: flex; align-items: center; justify-content: center; background: #fff0f9; border: 2px solid #ffccd5; border-radius: 20px; padding: 15px; gap: 20px; }
         #cell-0 { grid-column: 1; grid-row: 1; } #cell-1 { grid-column: 2; grid-row: 1; } #cell-2 { grid-column: 3; grid-row: 1; } #cell-3 { grid-column: 4; grid-row: 1; } #cell-4 { grid-column: 5; grid-row: 1; }
         #cell-5 { grid-column: 5; grid-row: 2; } #cell-6 { grid-column: 5; grid-row: 3; } #cell-7 { grid-column: 5; grid-row: 4; } #cell-8 { grid-column: 5; grid-row: 5; }
         #cell-9 { grid-column: 4; grid-row: 5; } #cell-10 { grid-column: 3; grid-row: 5; } #cell-11 { grid-column: 2; grid-row: 5; } #cell-12 { grid-column: 1; grid-row: 5; }
@@ -22,17 +28,44 @@
 </head>
 <body>
 
-<div class="board" id="board">
-    <img src="https://i.imgur.com/FGnMi8Y.png" id="p0" class="token" style="display:none">
-    <div class="center-zone">
-        <div id="turno-text">Bienvenido</div>
-        <img src="https://i.imgur.com/Nsafzb4.png" style="width:60px; cursor:pointer" onclick="tirarDado()">
-        <div>💖 $<span id="dinero-mio">1000</span></div>
+<div class="container">
+    <div class="game-column">
+        <div class="board" id="board">
+            <img src="https://i.imgur.com/FGnMi8Y.png" id="p0" class="token" style="display:none">
+            <img src="https://i.imgur.com/fRZJfP8.png" id="p1" class="token" style="display:none">
+            <img src="https://i.imgur.com/u2AtssG.png" id="p2" class="token" style="display:none">
+            <img src="https://i.imgur.com/ekQp8WL.png" id="p3" class="token" style="display:none">
+            <div class="center-zone">
+                <div id="turno-text" style="font-weight:bold;">ESPERANDO...</div>
+                <div id="dado-valor">0</div>
+                <img src="https://i.imgur.com/Nsafzb4.png" style="width:60px; cursor:pointer" onclick="tirarDado()">
+                <div id="acciones"></div>
+                <div>💖 $<span id="dinero-mio">1000</span></div>
+            </div>
+        </div>
+        <div id="banco-container">
+            <button class="btn" style="width: 150px" onclick="abrirBanco()">🏦 Préstamo</button>
+            <button class="btn" style="width: 150px" onclick="verSaldos()">💰 Ver Saldos</button>
+        </div>
+    </div>
+    <div class="sidebar">
+        <div class="panel">
+            <strong>Unirse a Sala</strong>
+            <input type="text" id="sala-id" class="input-field" placeholder="Nombre de la sala">
+            <button class="btn" onclick="unirse()">Entrar a Juego</button>
+        </div>
+        <div class="panel">
+            <strong>Historial</strong><div id="log"></div>
+            <strong>Chat</strong><div id="chat-log"></div>
+            <input type="text" id="chat-msg" class="input-field" placeholder="Mensaje...">
+            <button class="btn" onclick="enviarChat()">Enviar</button>
+        </div>
     </div>
 </div>
 
 <div id="modal">
     <h3 id="modal-title"></h3>
+    <p id="modal-text"></p>
     <div id="modal-extra"></div>
     <button class="btn" onclick="document.getElementById('modal').style.display='none'">Cerrar</button>
 </div>
@@ -41,53 +74,77 @@
     const firebaseConfig = { databaseURL: "https://monopolovely-default-rtdb.firebaseio.com" };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-    const mapa = [{n:"SALIDA",p:0},{n:"IGLESIA",p:100},{n:"?",p:0},{n:"BOUTIQUE",p:200},{n:"CÁRCEL",p:0},{n:"CHEONGDAM",p:500},{n:"GANGNAM",p:520},{n:"SEOCHO",p:250},{n:"MAPO",p:300},{n:"INCHEON",p:350},{n:"JOYAS",p:400},{n:"CÁRCEL",p:0},{n:"IMPUESTOS",p:0},{n:"?",p:0},{n:"ARCA",p:0},{n:"BUKCHON",p:500}];
-    let miIdx = 0, sala = "partida1"; 
+    let miIdx = -1, sala = "";
+    const nombres = ["Dog", "Horse", "Hat", "Car"];
+    const mapa = [{n:"SALIDA",p:0},{n:"IGLESIA",p:100},{n:"?",p:0},{n:"BOUTIQUE",p:200},{n:"A LA CÁRCEL",p:0},{n:"CHEONGDAM",p:500},{n:"GANGNAM",p:520},{n:"SEOCHO-GU",p:250},{n:"MAPO",p:300},{n:"INCHEON",p:350},{n:"JOYAS",p:400},{n:"CÁRCEL",p:0},{n:"IMPUESTOS",p:0},{n:"?",p:0},{n:"ARCA",p:0},{n:"BUKCHON",p:500}];
 
-    function verificarCasilla(pos) {
+    function log(txt) { db.ref('salas/' + sala + '/log').push(txt); }
+    function unirse() { sala = document.getElementById('sala-id').value; db.ref('salas/' + sala + '/jugadores').once('value', snap => { miIdx = snap.numChildren(); db.ref('salas/' + sala + '/jugadores/' + miIdx).set({ pos: 0, dinero: 1000, deuda: 0 }); if(miIdx == 0) db.ref('salas/' + sala + '/turno').set(0); sincronizar(); }); }
+    
+    function manejarCasilla(pos) {
         let p = mapa[pos];
         if (p.p === 0) return;
-        db.ref('salas/'+sala+'/propiedades/'+pos).once('value', snap => {
+        db.ref('salas/' + sala + '/propiedades/' + pos).once('value', snap => {
             let prop = snap.val();
             document.getElementById('modal-title').innerText = p.n;
-            let div = document.getElementById('modal-extra'); div.innerHTML = "";
-            
+            let extra = document.getElementById('modal-extra'); extra.innerHTML = "";
             if (!prop) {
-                div.innerHTML = `<button class="btn" onclick="comprar(${pos})">Comprar por $${p.p}</button>`;
+                document.getElementById('modal-text').innerText = "Precio: $" + p.p;
+                extra.innerHTML = `<button class="btn" onclick="comprar(${pos})">Comprar</button>`;
             } else if (prop.owner === miIdx) {
-                if (prop.nivel < 5) div.innerHTML = `<button class="btn" onclick="mejorar(${pos})">Mejorar (+$${p.p + 50})</button>`;
-                else div.innerHTML = "Hotel completado";
+                document.getElementById('modal-text').innerText = "Nivel actual: " + (prop.nivel || 0);
+                if (prop.nivel < 5) extra.innerHTML = `<button class="btn" onclick="mejorar(${pos})">Mejorar (+$${p.p + 50})</button>`;
+                else extra.innerHTML = "¡Hotel máximo!";
             } else {
                 let tasas = [0.10, 0.15, 0.20, 0.25, 0.30, 0.40];
-                div.innerText = "Alquiler a pagar: $" + (p.p * tasas[prop.nivel]);
+                document.getElementById('modal-text').innerText = "Alquiler a pagar: $" + Math.floor(p.p * tasas[prop.nivel || 0]);
             }
             document.getElementById('modal').style.display = 'block';
         });
     }
 
     function comprar(pos) {
-        db.ref('salas/'+sala+'/propiedades/'+pos).set({owner: miIdx, nivel: 0});
+        db.ref('salas/' + sala + '/propiedades/' + pos).set({owner: miIdx, nivel: 0});
         document.getElementById('modal').style.display = 'none';
     }
 
     function mejorar(pos) {
-        db.ref('salas/'+sala+'/propiedades/'+pos+'/nivel').transaction(n => (n || 0) + 1);
+        db.ref('salas/' + sala + '/propiedades/' + pos + '/nivel').transaction(n => (n || 0) + 1);
         document.getElementById('modal').style.display = 'none';
     }
 
-    function tirarDado() {
-        let val = Math.floor(Math.random()*6)+1;
-        db.ref('salas/'+sala+'/jugador/pos').transaction(p => (p + val) % mapa.length, (err, comm, snap) => {
-            verificarCasilla(snap.val());
-        });
+    function tirarDado() { 
+        if(miIdx === -1) return;
+        db.ref('salas/' + sala).once('value', snap => {
+            let s = snap.val(); if(s.turno !== miIdx) return;
+            let val = Math.floor(Math.random()*6)+1;
+            document.getElementById('dado-valor').innerText = val;
+            let nuevaPos = (s.jugadores[miIdx].pos + val) % mapa.length;
+            db.ref('salas/' + sala + '/jugadores/' + miIdx + '/pos').set(nuevaPos);
+            db.ref('salas/' + sala + '/turno').set((s.turno + 1) % s.jugadores.length);
+        }); 
     }
 
+    function abrirBanco() { document.getElementById('modal-title').innerText = "Banco"; document.getElementById('modal-text').innerText = "Solicita préstamo:"; let div = document.getElementById('modal-extra'); div.innerHTML = ""; [200, 400, 600].forEach(m => { let b = document.createElement('button'); b.className = 'btn'; b.innerText = "$"+m; b.onclick = () => { db.ref('salas/' + sala + '/jugadores/' + miIdx).transaction(j => { if(j) { j.dinero += m; } return j; }); document.getElementById('modal').style.display = 'none'; }; div.appendChild(b); }); document.getElementById('modal').style.display = 'block'; }
+    function verSaldos() { db.ref('salas/' + sala + '/jugadores').once('value', snap => { let txt = ""; snap.forEach(c => txt += nombres[c.key] + ": $" + c.val().dinero + "<br>"); document.getElementById('modal-title').innerText = "Saldos"; document.getElementById('modal-text').innerHTML = txt; document.getElementById('modal').style.display = 'block'; }); }
+    function enviarChat() { let msg = document.getElementById('chat-msg').value; db.ref('salas/' + sala + '/chat').push({ n: nombres[miIdx], m: msg }); document.getElementById('chat-msg').value = ""; }
+    
+    function sincronizar() { db.ref('salas/' + sala).on('value', snap => { 
+        let s = snap.val(); if(!s) return; 
+        document.getElementById('dinero-mio').innerText = s.jugadores[miIdx].dinero;
+        document.getElementById('turno-text').innerText = "Turno: " + nombres[s.turno];
+        s.jugadores.forEach((j, i) => { let el = document.getElementById('p' + i); el.style.display = 'block'; let cell = document.getElementById('cell-' + j.pos); el.style.left = (cell.offsetLeft + 15) + 'px'; el.style.top = (cell.offsetTop + 15) + 'px'; });
+        if(s.chat) { let h = ""; Object.values(s.chat).forEach(c => h += "<b>"+c.n+":</b> "+c.m+"<br>"); document.getElementById('chat-log').innerHTML = h; }
+        if(s.log) { let h = ""; Object.values(s.log).forEach(l => h += l + "<br>"); document.getElementById('log').innerHTML = h; }
+    }); }
+
     mapa.forEach((m, i) => { 
-        const d = document.createElement('div'); d.className = 'cell'; d.id = 'cell-'+i;
+        const d = document.createElement('div'); d.className = 'cell'; d.id = 'cell-' + i; 
         d.innerHTML = `${m.n}<br>${m.p > 0 ? '$'+m.p : ''}`;
-        d.onclick = () => verificarCasilla(i);
-        document.getElementById('board').appendChild(d);
+        d.onclick = () => manejarCasilla(i);
+        document.getElementById('board').appendChild(d); 
     });
 </script>
 </body>
+</html>
 </html>
