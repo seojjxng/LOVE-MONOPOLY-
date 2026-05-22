@@ -22,7 +22,7 @@
         .input-field { width: 93%; padding: 8px; margin: 5px 0; border: 1px solid #ffccd5; border-radius: 8px; }
         #log { height: 125px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; margin-bottom: 10px; }
         #chat-log { height: 125px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; margin-bottom: 10px; }
-        #modal { display: none; position: fixed; top: 20%; left: 35%; width: 300px; background: #ffe4e9; padding: 20px; border: 3px solid #ff80bf; border-radius: 15px; text-align: center; z-index: 999; }
+        #modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 300px; background: #ffe4e9; padding: 20px; border: 3px solid #ff80bf; border-radius: 15px; text-align: center; z-index: 999; }
         .card-property { border: 2px solid #c71585; padding: 10px; border-radius: 5px; background: white; margin-bottom: 10px; }
         .card-header { background: #ff80bf; color: white; padding: 5px; font-weight: bold; margin-bottom: 10px; }
         .empty-debt { padding: 10px; background: #fff; border: 1px solid #ff80bf; border-radius: 10px; color: #ff59aa; font-weight: bold; }
@@ -82,14 +82,8 @@
     let turnosSeis = 0;
 
     function cerrarModal() {
-    // Solo procesa la evasión si el usuario cerró el modal de alquiler intencionalmente
-    // sin haber pagado, y solo si realmente es un modal de alquiler
-    const titulo = document.getElementById('modal-title').innerText;
-    if (alquilerPendiente && titulo === "Tarjeta de Propiedad") {
-    }
         document.getElementById('modal').style.display = 'none';
-    // para evitar problemas si el modal se cierra por otro evento
-}
+    }
 
     function log(txt) { db.ref('salas/' + sala + '/log').push(txt); }
     function unirse() { 
@@ -108,15 +102,14 @@
     }
     
     function verificarBancarrota(jugadorIdx, saldo) {
-    if (saldo < 0) {
-        log("¡" + nombres[jugadorIdx] + " ha caído en números rojos!");
-        document.getElementById('modal-title').innerText = "¡Bancarrota!";
-        document.getElementById('modal-text').innerText = "Tu saldo es $" + saldo + ". ¡Te recomiendo un préstamo!";
-        // Ahora el botón llama directamente a abrir el banco
-        document.getElementById('modal-extra').innerHTML = `<button class="btn" onclick="abrirBanco()">Ir al Banco</button>`;
-        document.getElementById('modal').style.display = 'block';
+        if (saldo < 0) {
+            log("¡" + nombres[jugadorIdx] + " ha caído en números rojos!");
+            document.getElementById('modal-title').innerText = "¡Bancarrota!";
+            document.getElementById('modal-text').innerText = "Tu saldo es $" + saldo + ". ¡Te recomiendo un préstamo!";
+            document.getElementById('modal-extra').innerHTML = `<button class="btn" onclick="abrirBanco()">Ir al Banco</button>`;
+            document.getElementById('modal').style.display = 'block';
+        }
     }
-}
 
     function abrirIntercambio() {
         db.ref('salas/' + sala).once('value', snap => {
@@ -153,18 +146,17 @@
     }
 
     function escucharOfertas() {
-    db.ref('salas/' + sala + '/ofertas').on('child_added', snap => {
-        let o = snap.val();
-        if(o.para == miIdx) {
-            // Limpieza explícita antes de mostrar
-            document.getElementById('modal-extra').innerHTML = ""; 
-            document.getElementById('modal-title').innerText = "¡Oferta de compra!";
-            document.getElementById('modal-text').innerText = nombres[o.de] + " quiere venderte " + mapa[o.prop].n + " por $" + o.precio;
-            document.getElementById('modal-extra').innerHTML = `<button class="btn" onclick="confirmarCompra('${snap.key}')">Aceptar</button>`;
-            document.getElementById('modal').style.display = 'block';
-        }
-    });
-}
+        db.ref('salas/' + sala + '/ofertas').on('child_added', snap => {
+            let o = snap.val();
+            if(o.para == miIdx) {
+                document.getElementById('modal-extra').innerHTML = ""; 
+                document.getElementById('modal-title').innerText = "¡Oferta de compra!";
+                document.getElementById('modal-text').innerText = nombres[o.de] + " quiere venderte " + mapa[o.prop].n + " por $" + o.precio;
+                document.getElementById('modal-extra').innerHTML = `<button class="btn" onclick="confirmarCompra('${snap.key}')">Aceptar</button>`;
+                document.getElementById('modal').style.display = 'block';
+            }
+        });
+    }
 
     function confirmarCompra(oKey) {
         db.ref('salas/' + sala + '/ofertas/' + oKey).once('value', snap => {
@@ -362,7 +354,7 @@
             document.getElementById('dado-valor').innerText = dado;
             let posActual = Number(s.jugadores[miIdx].pos);
             let nuevaPos = (posActual + dado) % mapa.length;
-            if (nuevaPos < posActual) db.ref('salas/'+sala+'/jugadores/'+miIdx+'/dinero').transaction(d => d + 200);
+            if (nuevaPos < posActual) db.ref('salas/'+sala+'/jugadores/'+miIdx+'/dinero').transaction(d => d + 100);
             db.ref('salas/' + sala + '/jugadores/' + miIdx + '/pos').set(nuevaPos);
             pasarTurno();
             setTimeout(() => manejarCasilla(nuevaPos), 600);
@@ -393,7 +385,10 @@
                     });
                     log(nombres[miIdx] + " liquidó su préstamo.");
                 } else {
-                    alert("No tienes suficiente dinero para pagar el préstamo.");
+                    document.getElementById('modal-title').innerText = "Fondos insuficientes";
+                    document.getElementById('modal-text').innerHTML = `<div class="empty-debt">No tienes suficiente dinero para pagar el préstamo.</div>`;
+                    document.getElementById('modal-extra').innerHTML = "";
+                    document.getElementById('modal').style.display = 'block';
                 }
             } else {
                 document.getElementById('modal-title').innerText = "Banco";
@@ -402,7 +397,6 @@
                 document.getElementById('modal').style.display = 'block';
             }
         });
-        document.getElementById('modal').style.display = 'none';
     }
     
     function verSaldos() { 
