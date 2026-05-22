@@ -51,7 +51,7 @@
             <button class="btn" style="width: 140px" onclick="abrirBanco()">🏦 Préstamo</button>
             <button class="btn" style="width: 140px" onclick="pagarPrestamo()">💳 Pagar Préstamo</button>
             <button class="btn" style="width: 140px" onclick="verSaldos()">💰 Ver Saldos</button>
-            <button class="btn" style="width: 140px; background: #c71585;" onclick="abrirIntercambio()">🤝 Intercambiar</button>
+            <button class="btn" style="width: 140px; background: #ff59aa;" onclick="abrirIntercambio()">🤝 Intercambiar</button>
         </div>
     </div>
     <div class="sidebar">
@@ -217,7 +217,7 @@
                              <p>Estado: <b>${prop.hipotecada ? "Hipotecada" : "Activa"}</b></p>`;
                 if (!prop.hipotecada) {
                     if (prop.nivel < 5) extra.innerHTML += `<button class="btn" onclick="mejorar(${pos})">Mejorar ($50)</button>`;
-                    extra.innerHTML += `<button class="btn" onclick="hipotecar(${pos})">Hipotecar (+$${Math.floor(p.p/2)})</button>`;
+                    extra.innerHTML += `<button class="btn" style="background: #ad0c0c;" onclick="hipotecar(${pos})">Hipotecar (+$${Math.floor(p.p/2)})</button>`;
                 } else {
                     extra.innerHTML += `<button class="btn" onclick="liberar(${pos})">Liberar (-$${Math.floor(p.p*0.6)})</button>`;
                 }
