@@ -97,6 +97,16 @@
         }); 
     }
     
+    function verificarBancarrota(jugadorIdx, saldo) {
+        if (saldo < 0) {
+            log("¡" + nombres[jugadorIdx] + " ha quedado en bancarrota!");
+            document.getElementById('modal-title').innerText = "¡Bancarrota!";
+            document.getElementById('modal-text').innerText = "Tu saldo es negativo. ¡Necesitas un préstamo urgente!";
+            document.getElementById('modal-extra').innerHTML = `<button class="btn" onclick="abrirBanco()">Pedir Préstamo</button>`;
+            document.getElementById('modal').style.display = 'block';
+        }
+    }
+
     function manejarCasilla(pos) {
         let p = mapa[pos];
         let extra = document.getElementById('modal-extra'); extra.innerHTML = "";
@@ -119,7 +129,11 @@
                 {m: "Recargo por lujo: Pagas $250.", v: 250}
             ];
             let sit = situaciones[Math.floor(Math.random()*situaciones.length)];
-            db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => Number(d) - sit.v);
+            db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => {
+                let nuevo = Number(d) - sit.v;
+                setTimeout(() => verificarBancarrota(miIdx, nuevo), 500);
+                return nuevo;
+            });
             log(nombres[miIdx] + " " + sit.m);
             document.getElementById('modal-title').innerText = "Impuestos";
             document.getElementById('modal-text').innerText = sit.m;
@@ -186,7 +200,11 @@
             {t:"?", m:"¡Ganaste una rifa de belleza! Ganas $130.", v:130}
         ];
         let e = eventos[Math.floor(Math.random()*eventos.length)];
-        db.ref('salas/'+sala+'/jugadores/'+miIdx+'/dinero').transaction(d => Number(d) + e.v);
+        db.ref('salas/'+sala+'/jugadores/'+miIdx+'/dinero').transaction(d => {
+            let nuevo = Number(d) + e.v;
+            setTimeout(() => verificarBancarrota(miIdx, nuevo), 500);
+            return nuevo;
+        });
         log(nombres[miIdx] + " " + e.t + ": " + e.m); 
         document.getElementById('modal-title').innerText = e.t; 
         document.getElementById('modal-text').innerText = e.m; 
@@ -196,7 +214,11 @@
     function cerrarConInteres() {
         if(alquilerPendiente) {
             let multa = alquilerPendiente.monto + 50;
-            db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => Number(d) - multa);
+            db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => {
+                let nuevo = Number(d) - multa;
+                setTimeout(() => verificarBancarrota(miIdx, nuevo), 500);
+                return nuevo;
+            });
             log(nombres[miIdx] + " evadió deuda y pagó $" + multa + " con penalización.");
             alquilerPendiente = null;
         }
@@ -208,6 +230,9 @@
             if(!j) return;
             j[d].dinero = Number(j[d].dinero) - m;
             j[a].dinero = Number(j[a].dinero) + m;
+            setTimeout(() => {
+                db.ref('salas/' + sala + '/jugadores/' + d + '/dinero').once('value', s => verificarBancarrota(d, s.val()));
+            }, 500);
             return j;
         });
         log(nombres[d] + " pagó $" + m + " a " + nombres[a]);
@@ -244,8 +269,33 @@
         }); 
     }
 
-    function abrirBanco() { document.getElementById('modal-title').innerText = "Préstamo"; let div = document.getElementById('modal-extra'); div.innerHTML = ""; [200, 500].forEach(m => { let b = document.createElement('button'); b.className = 'btn'; b.innerText = "Pedir $"+m; b.onclick = () => { db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => Number(d) + m); document.getElementById('modal').style.display = 'none'; }; div.appendChild(b); }); document.getElementById('modal').style.display = 'block'; }
-    function verSaldos() { db.ref('salas/' + sala + '/jugadores').once('value', snap => { let txt = ""; snap.forEach(c => txt += nombres[c.key] + ": $" + c.val().dinero + "<br>"); document.getElementById('modal-title').innerText = "Saldos"; document.getElementById('modal-text').innerHTML = txt; document.getElementById('modal-extra').innerHTML = ""; document.getElementById('modal').style.display = 'block'; }); }
+    function abrirBanco() { 
+        document.getElementById('modal-title').innerText = "Préstamo"; 
+        let div = document.getElementById('modal-extra'); div.innerHTML = ""; 
+        [200, 500, 650, 800, 900].forEach(m => { 
+            let b = document.createElement('button'); 
+            b.className = 'btn'; 
+            b.innerText = "Pedir $"+m; 
+            b.onclick = () => { 
+                db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => Number(d) + m); 
+                document.getElementById('modal').style.display = 'none'; 
+            }; 
+            div.appendChild(b); 
+        }); 
+        document.getElementById('modal').style.display = 'block'; 
+    }
+    
+    function verSaldos() { 
+        db.ref('salas/' + sala + '/jugadores').once('value', snap => { 
+            let txt = ""; 
+            snap.forEach(c => txt += nombres[c.key] + ": $" + c.val().dinero + "<br>"); 
+            document.getElementById('modal-title').innerText = "Saldos de todos"; 
+            document.getElementById('modal-text').innerHTML = txt; 
+            document.getElementById('modal-extra').innerHTML = ""; 
+            document.getElementById('modal').style.display = 'block'; 
+        }); 
+    }
+    
     function enviarChat() { let msg = document.getElementById('chat-msg').value; db.ref('salas/' + sala + '/chat').push({ n: nombres[miIdx], m: msg }); document.getElementById('chat-msg').value = ""; }
     
     function sincronizar() { db.ref('salas/' + sala).on('value', snap => { 
