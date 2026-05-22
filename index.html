@@ -17,7 +17,8 @@
         .panel { background: #fff0f9; padding: 20px; border-radius: 20px; border: 2px solid #ffccd5; }
         .btn { width: 100%; padding: 10px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin: 5px 0; font-size: 12px; }
         .input-field { width: 93%; padding: 8px; margin: 5px 0; border: 1px solid #ffccd5; border-radius: 8px; }
-        #log, #chat-log { height: 150px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; margin-bottom: 10px; }
+        #log { height: 125px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; margin-bottom: 10px; }
+        #chat-log { height: 125px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; margin-bottom: 10px; }
         #modal { display: none; position: fixed; top: 20%; left: 35%; width: 300px; background: #ffe4e9; padding: 20px; border: 3px solid #ff80bf; border-radius: 15px; text-align: center; z-index: 999; }
         #banco-container { display: flex; align-items: center; justify-content: center; background: #fff0f9; border: 2px solid #ffccd5; border-radius: 20px; padding: 15px; gap: 20px; }
         #cell-0 { grid-column: 1; grid-row: 1; } #cell-1 { grid-column: 2; grid-row: 1; } #cell-2 { grid-column: 3; grid-row: 1; } #cell-3 { grid-column: 4; grid-row: 1; } #cell-4 { grid-column: 5; grid-row: 1; }
@@ -89,9 +90,9 @@
         sala = document.getElementById('sala-id').value; 
         db.ref('salas/' + sala + '/jugadores').once('value', snap => { 
             miIdx = snap.numChildren(); 
-            db.ref('salas/' + sala + '/jugadores/' + miIdx).set({ pos: 0, dinero: 1000, enCarcel: 0, turnosCarcel: 0 }); 
+            db.ref('salas/' + sala + '/jugadores/' + miIdx).set({ pos: 0, dinero: 1000, deuda: 0, pausasDeuda: 0, enCarcel: 0 }); 
             if(miIdx == 0) db.ref('salas/' + sala + '/turno').set(0); 
-            db.ref('salas/' + sala + '/chat').push({ n: "Sistema", m: nombres[miIdx] + " ha entrado." });
+            db.ref('salas/' + sala + '/chat').push({ n: "Sistema", m: nombres[miIdx] + " ha entrado a la sala." });
             sincronizar(); 
         }); 
     }
@@ -100,11 +101,11 @@
         let p = mapa[pos];
         let extra = document.getElementById('modal-extra'); extra.innerHTML = "";
         if (p.n === "A LA CÁRCEL" || p.n === "CÁRCEL") {
-            db.ref('salas/'+sala+'/jugadores/'+miIdx).update({pos: 11, enCarcel: 1, turnosCarcel: 2});
-            log(nombres[miIdx] + " está en la cárcel por 2 turnos.");
+            db.ref('salas/'+sala+'/jugadores/'+miIdx).update({pos: 11, enCarcel: 1});
+            log(nombres[miIdx] + " terminó en la cárcel.");
             document.getElementById('modal-title').innerText = "Cárcel";
-            document.getElementById('modal-text').innerText = "Estás arrestado. Paga $100 de fianza o espera 2 turnos.";
-            extra.innerHTML = `<button class="btn" onclick="pagarFianza()">Pagar Fianza ($100)</button>`;
+            document.getElementById('modal-text').innerText = "Estás bajo arresto. ¿Pagar $100 de fianza?";
+            extra.innerHTML = `<button class="btn" onclick="pagarFianza()">Pagar Fianza</button><button class="btn" onclick="liberarCarcel()">No pagar</button>`;
             document.getElementById('modal').style.display = 'block';
             return;
         }
@@ -123,29 +124,42 @@
             let prop = snap.val();
             document.getElementById('modal-title').innerText = p.n;
             if (!prop) {
-                document.getElementById('modal-text').innerText = "Precio: $" + p.p + ". Las mejoras cuestan $50 cada una.";
+                document.getElementById('modal-text').innerText = "Precio: $" + p.p;
                 extra.innerHTML = `<button class="btn" onclick="comprar(${pos})">Comprar</button>`;
             } else if (prop.owner === miIdx) {
-                let n = prop.nivel || 0;
-                let nombresNivel = ["(Base)", "1 Casa", "2 Casas", "3 Casas", "4 Casas", "Hotel"];
-                document.getElementById('modal-text').innerText = "Nivel actual: " + nombresNivel[n];
-                if (n < 5) extra.innerHTML = `<button class="btn" onclick="mejorar(${pos})">Mejorar por $50</button>`;
+                const niveles = ["Ninguna", "1 Casa", "2 Casas", "3 Casas", "4 Casas", "Hotel"];
+                document.getElementById('modal-text').innerText = "Nivel: " + niveles[prop.nivel || 0];
+                if (prop.nivel < 5) extra.innerHTML = `<button class="btn" onclick="mejorar(${pos})">Mejorar (Precio + $50)</button>`;
             } else {
-                let tasas = [0.10, 0.15, 0.20, 0.30, 0.40, 0.50];
-                let alquiler = Math.floor(p.p * tasas[prop.nivel || 0]);
+                let porcentajes = [0.10, 0.15, 0.20, 0.30, 0.40, 0.50];
+                let alquiler = Math.floor(p.p * porcentajes[prop.nivel || 0]);
                 alquilerPendiente = { monto: alquiler, dueño: prop.owner };
-                document.getElementById('modal-text').innerText = "Alquiler actual: $" + alquiler;
-                extra.innerHTML = `<button class="btn" onclick="procesarPago(${miIdx}, ${prop.owner}, ${alquiler}); alquilerPendiente=null; document.getElementById('modal').style.display='none'">Pagar</button>`;
+                document.getElementById('modal-text').innerText = "Alquiler: $" + alquiler;
+                extra.innerHTML = `<button class="btn" onclick="procesarPago(${miIdx}, ${prop.owner}, ${alquiler})">Pagar</button>`;
             }
             document.getElementById('modal').style.display = 'block';
         });
     }
 
     function pagarFianza() {
-        db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ enCarcel: 0, turnosCarcel: 0 });
+        db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ enCarcel: 0 });
         db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => Number(d) - 100);
-        log(nombres[miIdx] + " pagó fianza.");
+        log(nombres[miIdx] + " pagó $100 de fianza.");
         document.getElementById('modal').style.display = 'none';
+    }
+
+    function liberarCarcel() {
+        document.getElementById('modal').style.display = 'none';
+        pasarTurno();
+    }
+
+    function pasarTurno() {
+        db.ref('salas/'+sala+'/jugadores').once('value', snap => {
+            let total = snap.numChildren();
+            db.ref('salas/'+sala+'/turno').once('value', tSnap => {
+                db.ref('salas/'+sala+'/turno').set((Number(tSnap.val()) + 1) % total);
+            });
+        });
     }
 
     function ejecutarEvento() {
@@ -159,10 +173,10 @@
     }
 
     function cerrarConInteres() {
-        if (alquilerPendiente) {
+        if(alquilerPendiente) {
             let multa = alquilerPendiente.monto + 50;
             db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => Number(d) - multa);
-            log(nombres[miIdx] + " evadió deuda. Pagó: $" + multa);
+            log(nombres[miIdx] + " evadió deuda y pagó $" + multa + " con penalización.");
             alquilerPendiente = null;
         }
         document.getElementById('modal').style.display = 'none';
@@ -176,6 +190,8 @@
             return j;
         });
         log(nombres[d] + " pagó $" + m + " a " + nombres[a]);
+        alquilerPendiente = null;
+        document.getElementById('modal').style.display = 'none';
     }
 
     function comprar(pos) { log(nombres[miIdx] + " compró " + mapa[pos].n); db.ref('salas/' + sala + '/propiedades/' + pos).set({owner: miIdx, nivel: 0}); db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => Number(d) - Number(mapa[pos].p)); document.getElementById('modal').style.display = 'none'; }
@@ -185,19 +201,10 @@
         if(miIdx === -1) return;
         db.ref('salas/' + sala).once('value', snap => {
             let s = snap.val(); if(s.turno !== miIdx) return;
-            
-            if(s.jugadores[miIdx].enCarcel) {
-                if(s.jugadores[miIdx].turnosCarcel > 1) {
-                    db.ref('salas/' + sala + '/jugadores/' + miIdx + '/turnosCarcel').transaction(n => n - 1);
-                    log(nombres[miIdx] + " sigue en prisión.");
-                } else {
-                    db.ref('salas/' + sala + '/jugadores/' + miIdx).update({enCarcel: 0, turnosCarcel: 0});
-                    log(nombres[miIdx] + " salió de prisión.");
-                }
-                db.ref('salas/' + sala + '/turno').set((Number(s.turno) + 1) % s.jugadores.length);
-                return;
+            if(s.jugadores[miIdx].enCarcel) { 
+                pasarTurno();
+                return; 
             }
-
             let val = Math.floor(Math.random()*6)+1;
             document.getElementById('dado-valor').innerText = val;
             let posActual = Number(s.jugadores[miIdx].pos);
@@ -205,7 +212,9 @@
             
             if (nuevaPos < posActual) {
                 db.ref('salas/'+sala+'/jugadores/'+miIdx+'/dinero').transaction(d => d + 200);
+                log(nombres[miIdx] + " pasó por SALIDA y recibió $200.");
             }
+            
             db.ref('salas/' + sala + '/jugadores/' + miIdx + '/pos').set(nuevaPos);
             db.ref('salas/' + sala + '/turno').set((Number(s.turno) + 1) % s.jugadores.length);
             setTimeout(() => manejarCasilla(nuevaPos), 600);
