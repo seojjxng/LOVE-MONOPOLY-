@@ -56,7 +56,7 @@
         <div class="panel">
             <strong>Unirse a Sala</strong>
             <input type="text" id="sala-id" class="input-field" placeholder="Nombre de la sala">
-            <button class="btn" onclick="unirse()">Entrar a Juego</button>
+            <button class="btn" id="btn-unirse" onclick="unirse()">Entrar a Juego</button>
         </div>
         <div class="panel">
             <strong>Historial</strong><div id="log"></div>
@@ -78,7 +78,7 @@
     const firebaseConfig = { databaseURL: "https://monopolovely-default-rtdb.firebaseio.com" };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-    let miIdx = -1, sala = "";
+    let miIdx = -1, sala = "", yaEntro = false;
     const nombres = ["Dog", "Horse", "Hat", "Car"];
     const colores = ["#ffb7b2", "#ffd8a8", "#b2f2bb", "#a5d8ff"];
     const mapa = [{n:"SALIDA",p:0},{n:"IGLESIA",p:100},{n:"?",p:0},{n:"BOUTIQUE",p:200},{n:"A LA CÁRCEL",p:0},{n:"CHEONGDAM",p:500},{n:"GANGNAM",p:520},{n:"SEOCHO-GU",p:250},{n:"MAPO",p:300},{n:"INCHEON",p:350},{n:"JOYAS",p:400},{n:"CÁRCEL",p:0},{n:"IMPUESTOS",p:0},{n:"?",p:0},{n:"ARCA",p:0},{n:"BUKCHON",p:500}];
@@ -87,7 +87,11 @@
 
     function log(txt) { db.ref('salas/' + sala + '/log').push(txt); }
     function unirse() { 
+        if(yaEntro) return;
         sala = document.getElementById('sala-id').value; 
+        if(!sala) return;
+        yaEntro = true;
+        document.getElementById('btn-unirse').disabled = true;
         db.ref('salas/' + sala + '/jugadores').once('value', snap => { 
             miIdx = snap.numChildren(); 
             db.ref('salas/' + sala + '/jugadores/' + miIdx).set({ pos: 0, dinero: 1000, deuda: 0, pausasDeuda: 0, enCarcel: 0 }); 
@@ -111,7 +115,7 @@
         let p = mapa[pos];
         let extra = document.getElementById('modal-extra'); extra.innerHTML = "";
         if (p.n === "A LA CÁRCEL" || p.n === "CÁRCEL") {
-    db.ref('salas/'+sala+'/jugadores/'+miIdx).update({pos: 11, enCarcel: 1, turnosCarcel: 1});
+            db.ref('salas/'+sala+'/jugadores/'+miIdx).update({pos: 11, enCarcel: 1, turnosCarcel: 1});
             log(nombres[miIdx] + " terminó en la cárcel.");
             document.getElementById('modal-title').innerText = "Cárcel";
             document.getElementById('modal-text').innerText = "Estás bajo arresto. ¿Pagar $100 de fianza?";
@@ -288,7 +292,10 @@
     function verSaldos() { 
         db.ref('salas/' + sala + '/jugadores').once('value', snap => { 
             let txt = ""; 
-            snap.forEach(c => txt += nombres[c.key] + ": $" + c.val().dinero + "<br>"); 
+            snap.forEach(c => {
+                let idx = parseInt(c.key);
+                txt += nombres[idx] + ": $" + c.val().dinero + "<br>";
+            }); 
             document.getElementById('modal-title').innerText = "Saldos de todos"; 
             document.getElementById('modal-text').innerHTML = txt; 
             document.getElementById('modal-extra').innerHTML = ""; 
