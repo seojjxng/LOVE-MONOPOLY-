@@ -255,11 +255,6 @@
             document.getElementById('modal').style.display = 'block';
         });
     }
-            htmlCard += `</div>`;
-            document.getElementById('modal-text').innerHTML = htmlCard;
-            document.getElementById('modal').style.display = 'block';
-        });
-    }
 
     function hipotecar(pos) {
         db.ref('salas/'+sala+'/propiedades/'+pos).update({hipotecada: true});
