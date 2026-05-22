@@ -57,7 +57,7 @@
         <div class="panel">
             <strong>Unirse a Sala</strong>
             <input type="text" id="sala-id" class="input-field" placeholder="Nombre de la sala">
-            <button class="btn" id="btn-unirse" onclick="unirse()">Entrar a Juego</button>
+            <button class="btn" id="btn-unirse" onclick="unirse()">Entrar a la sala</button>
         </div>
         <div class="panel">
             <strong>Historial</strong><div id="log"></div>
@@ -135,7 +135,7 @@
         if (p.n === "IMPUESTOS") {
             let situaciones = [
                 {m: "Declaración de ingresos: Pagas $200.", v: 200},
-                {m: "Tasa de servicio público: Pagas $150.", v: 150},
+                {m: "Ofrenda para los niños de la iglesia: Pagas $150.", v: 150},
                 {m: "Contribución a la ciudad: Pagas $180.", v: 180},
                 {m: "Multa por exceso de velocidad: Pagas $120.", v: 120},
                 {m: "Recargo por lujo: Pagas $250.", v: 250},
@@ -211,16 +211,16 @@
         let p = mapa[Number(document.getElementById('p'+miIdx).dataset.pos || 0)];
         let esArca = (p && p.n === "ARCA");
         let eventos = esArca ? [
-            {t:"Arca Comunal", m:"Donación a la comunidad: Ganas $100.", v:100},
+            {t:"Arca Comunal", m:"Herencia de una tía de una tía: Ganas $100.", v:100},
             {t:"Arca Comunal", m:"Reembolso de impuestos: Ganas $200.", v:200},
             {t:"Arca Comunal", m:"Venta de pasteles benéficos: Ganas $150.", v:150},
             {t:"Arca Comunal", m:"Premio por voluntariado: Ganas $120.", v:120},
             {t:"Arca Comunal", m:"Error bancario a tu favor: Ganas $250.", v:250}
         ] : [
             {t:"?", m:"¡Encontraste dinero perdido! Ganas $80.", v:80},
-            {t:"?", m:"Multa por estacionamiento prohibido: Pierdes $50.", v:-50},
-            {t:"?", m:"¡Promoción en la Boutique! Ganas $100.", v:100},
-            {t:"?", m:"Gastos de mantenimiento inesperados: Pierdes $70.", v:-70},
+            {t:"?", m:"Multa por estacionamiento: Pierdes $200.", v:-200},
+            {t:"?", m:"Nómina salarial: Ganas $100.", v:100},
+            {t:"?", m:"Gastos de mantenimiento inesperados: Pierdes $170.", v:-170},
             {t:"?", m:"¡Ganaste una rifa de belleza! Ganas $130.", v:130}
         ];
         let e = eventos[Math.floor(Math.random()*eventos.length)];
