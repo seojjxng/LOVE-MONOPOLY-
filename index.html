@@ -7,17 +7,13 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <style>
         body { background: #fff0f3; font-family: 'Montserrat', sans-serif; display: flex; justify-content: center; padding: 20px; color: #c71585; }
-        .container { display: flex; gap: 25px; width: 1000px; }
-        .game-column { display: flex; flex-direction: column; gap: 15px; }
+        .container { display: flex; gap: 25px; }
         .board { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(5, 100px); gap: 8px; background: #ffccd5; padding: 15px; border-radius: 25px; position: relative; }
         .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; cursor: pointer; }
         .token { width: 35px; height: 35px; position: absolute; z-index: 10; transition: all 0.5s ease; pointer-events: none; }
-        .center-zone { grid-column: 2 / 5; grid-row: 2 / 5; background: #fff5f7; border: 3px dashed #ff80bf; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; }
-        .sidebar { width: 320px; display: flex; flex-direction: column; gap: 20px; }
-        .panel { background: #fff0f9; padding: 20px; border-radius: 20px; border: 2px solid #ffccd5; }
-        .btn { width: 100%; padding: 10px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin: 5px 0; font-size: 12px; }
+        .center-zone { grid-column: 2 / 5; grid-row: 2 / 5; background: #fff5f7; border: 3px dashed #ff80bf; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .btn { width: 100%; padding: 10px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin: 5px 0; }
         #modal { display: none; position: fixed; top: 20%; left: 35%; width: 300px; background: #ffe4e9; padding: 20px; border: 3px solid #ff80bf; border-radius: 15px; text-align: center; z-index: 999; }
-        #banco-container { display: flex; align-items: center; justify-content: center; background: #fff0f9; border: 2px solid #ffccd5; border-radius: 20px; padding: 15px; gap: 20px; }
         #cell-0 { grid-column: 1; grid-row: 1; } #cell-1 { grid-column: 2; grid-row: 1; } #cell-2 { grid-column: 3; grid-row: 1; } #cell-3 { grid-column: 4; grid-row: 1; } #cell-4 { grid-column: 5; grid-row: 1; }
         #cell-5 { grid-column: 5; grid-row: 2; } #cell-6 { grid-column: 5; grid-row: 3; } #cell-7 { grid-column: 5; grid-row: 4; } #cell-8 { grid-column: 5; grid-row: 5; }
         #cell-9 { grid-column: 4; grid-row: 5; } #cell-10 { grid-column: 3; grid-row: 5; } #cell-11 { grid-column: 2; grid-row: 5; } #cell-12 { grid-column: 1; grid-row: 5; }
@@ -26,39 +22,12 @@
 </head>
 <body>
 
-<div class="container">
-    <div class="game-column">
-        <div class="board" id="board">
-            <div id="tokens-layer">
-                <img src="https://i.imgur.com/FGnMi8Y.png" id="p0" class="token" style="display:none">
-                <img src="https://i.imgur.com/fRZJfP8.png" id="p1" class="token" style="display:none">
-                <img src="https://i.imgur.com/u2AtssG.png" id="p2" class="token" style="display:none">
-                <img src="https://i.imgur.com/ekQp8WL.png" id="p3" class="token" style="display:none">
-            </div>
-            <div class="center-zone">
-                <div id="turno-text">ESPERANDO...</div>
-                <div id="dado-valor">0</div>
-                <img src="https://i.imgur.com/Nsafzb4.png" style="width:60px; cursor:pointer" onclick="tirarDado()">
-                <div>💖 $<span id="dinero-mio">1000</span></div>
-            </div>
-        </div>
-        <div id="banco-container">
-            <button class="btn" onclick="abrirBanco()">🏦 Préstamo</button>
-            <button class="btn" onclick="verSaldos()">💰 Saldos</button>
-        </div>
-    </div>
-    <div class="sidebar">
-        <div class="panel">
-            <strong>Unirse a Sala</strong>
-            <input type="text" id="sala-id" class="input-field">
-            <button class="btn" onclick="unirse()">Entrar</button>
-        </div>
-        <div class="panel">
-            <strong>Historial</strong><div id="log"></div>
-            <strong>Chat</strong><div id="chat-log"></div>
-            <input type="text" id="chat-msg" class="input-field">
-            <button class="btn" onclick="enviarChat()">Enviar</button>
-        </div>
+<div class="board" id="board">
+    <img src="https://i.imgur.com/FGnMi8Y.png" id="p0" class="token" style="display:none">
+    <div class="center-zone">
+        <div id="turno-text">Bienvenido</div>
+        <img src="https://i.imgur.com/Nsafzb4.png" style="width:60px; cursor:pointer" onclick="tirarDado()">
+        <div>💖 $<span id="dinero-mio">1000</span></div>
     </div>
 </div>
 
@@ -72,42 +41,25 @@
     const firebaseConfig = { databaseURL: "https://monopolovely-default-rtdb.firebaseio.com" };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-    let miIdx = -1, sala = "";
-    const nombres = ["Dog", "Horse", "Hat", "Car"];
     const mapa = [{n:"SALIDA",p:0},{n:"IGLESIA",p:100},{n:"?",p:0},{n:"BOUTIQUE",p:200},{n:"CÁRCEL",p:0},{n:"CHEONGDAM",p:500},{n:"GANGNAM",p:520},{n:"SEOCHO",p:250},{n:"MAPO",p:300},{n:"INCHEON",p:350},{n:"JOYAS",p:400},{n:"CÁRCEL",p:0},{n:"IMPUESTOS",p:0},{n:"?",p:0},{n:"ARCA",p:0},{n:"BUKCHON",p:500}];
-
-    function unirse() { 
-        sala = document.getElementById('sala-id').value; 
-        db.ref('salas/'+sala+'/jugadores/'+(Math.floor(Math.random()*4))).set({pos:0, dinero:1000});
-        miIdx = 0; sincronizar(); 
-    }
-
-    function tirarDado() {
-        db.ref('salas/'+sala+'/jugadores/'+miIdx).once('value', s => {
-            let j = s.val();
-            let val = Math.floor(Math.random()*6)+1;
-            let nuevaPos = (j.pos + val) % mapa.length;
-            if(nuevaPos < j.pos) db.ref('salas/'+sala+'/jugadores/'+miIdx+'/dinero').transaction(d => d + 200);
-            db.ref('salas/'+sala+'/jugadores/'+miIdx+'/pos').set(nuevaPos);
-            verificarCasilla(nuevaPos);
-        });
-    }
+    let miIdx = 0, sala = "partida1"; 
 
     function verificarCasilla(pos) {
-        db.ref('salas/'+sala+'/propiedades/'+pos).once('value', s => {
-            let prop = s.val();
-            document.getElementById('modal-title').innerText = mapa[pos].n;
-            let extra = document.getElementById('modal-extra'); extra.innerHTML = "";
+        let p = mapa[pos];
+        if (p.p === 0) return;
+        db.ref('salas/'+sala+'/propiedades/'+pos).once('value', snap => {
+            let prop = snap.val();
+            document.getElementById('modal-title').innerText = p.n;
+            let div = document.getElementById('modal-extra'); div.innerHTML = "";
             
-            if (!prop && mapa[pos].p > 0) {
-                extra.innerHTML = `<button class="btn" onclick="comprar(${pos})">Comprar ($${mapa[pos].p})</button>`;
-            } else if (prop && prop.owner === miIdx) {
-                extra.innerHTML = `Nivel: ${prop.nivel}<br><button class="btn" onclick="mejorar(${pos})">Mejorar (+$50)</button>`;
-            } else if (prop && prop.owner !== miIdx) {
+            if (!prop) {
+                div.innerHTML = `<button class="btn" onclick="comprar(${pos})">Comprar por $${p.p}</button>`;
+            } else if (prop.owner === miIdx) {
+                if (prop.nivel < 5) div.innerHTML = `<button class="btn" onclick="mejorar(${pos})">Mejorar (+$${p.p + 50})</button>`;
+                else div.innerHTML = "Hotel completado";
+            } else {
                 let tasas = [0.10, 0.15, 0.20, 0.25, 0.30, 0.40];
-                let alquiler = Math.floor(mapa[pos].p * tasas[prop.nivel]);
-                extra.innerHTML = `Es de ${nombres[prop.owner]}. Pagar alquiler: $${alguien}`;
-                // Lógica de pago aquí...
+                div.innerText = "Alquiler a pagar: $" + (p.p * tasas[prop.nivel]);
             }
             document.getElementById('modal').style.display = 'block';
         });
@@ -119,19 +71,14 @@
     }
 
     function mejorar(pos) {
-        db.ref('salas/'+sala+'/propiedades/'+pos+'/nivel').transaction(n => n < 5 ? n + 1 : 5);
+        db.ref('salas/'+sala+'/propiedades/'+pos+'/nivel').transaction(n => (n || 0) + 1);
         document.getElementById('modal').style.display = 'none';
     }
 
-    function sincronizar() {
-        db.ref('salas/'+sala).on('value', snap => {
-            let s = snap.val(); if(!s) return;
-            s.jugadores.forEach((j, i) => {
-                let cell = document.getElementById('cell-'+j.pos);
-                let el = document.getElementById('p'+i);
-                el.style.display = 'block';
-                el.style.left = (cell.offsetLeft + 15) + 'px'; el.style.top = (cell.offsetTop + 15) + 'px';
-            });
+    function tirarDado() {
+        let val = Math.floor(Math.random()*6)+1;
+        db.ref('salas/'+sala+'/jugador/pos').transaction(p => (p + val) % mapa.length, (err, comm, snap) => {
+            verificarCasilla(snap.val());
         });
     }
 
