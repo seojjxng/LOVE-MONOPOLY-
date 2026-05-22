@@ -284,7 +284,7 @@
                 let nuevoTurno = (t + 1) % total;
                 db.ref('salas/'+sala+'/jugadores/'+nuevoTurno).once('value', jSnap => {
                     let jugador = jSnap.val();
-                    if(jSnap.enCarcel > 0) {
+                    if(jugador.enCarcel > 0) {
                     log(nombres[nuevoTurno] + " está en la cárcel y pierde el turno.");
                         db.ref('salas/'+sala+'/jugadores/'+nuevoTurno).update({
                         enCarcel: jugador.enCarcel - 1
@@ -349,7 +349,10 @@
         if(miIdx === -1) return;
         db.ref('salas/' + sala).once('value', snap => {
             let s = snap.val(); 
-            if(s.turno !== miIdx || s.jugadores[miIdx].enCarcel === 0) return;
+            if(s.turno !== miIdx || s.jugadores[miIdx].enCarcel > 0) {
+            log("No es tu turno o estás en la cárcel.");
+            return;
+        }
             let dado = Math.floor(Math.random()*6)+1;
             document.getElementById('dado-valor').innerText = dado;
             
