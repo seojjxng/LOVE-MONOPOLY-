@@ -8,23 +8,9 @@
         body { background: #fff0f3; font-family: 'Montserrat', sans-serif; display: flex; justify-content: center; padding: 20px; color: #c71585; }
         .container { display: flex; gap: 25px; width: 1000px; }
         .game-column { display: flex; flex-direction: column; gap: 15px; }
-        .board {
-    display: grid;
-    grid-template-columns: repeat(5, 100px);
-    grid-template-rows: repeat(5, 100px);
-    gap: 8px;
-    padding: 15px;
-    background-color: #fff; /* Asegura un fondo sólido */
-    box-sizing: border-box; /* Crucial para incluir padding y borde en el tamaño total */
-    margin: 0 auto; /* Centra el tablero en el contenedor */
-    width: fit-content; /* Ajusta el ancho al contenido exacto */
-}
-        .cell {
-    width: 100px;
-    height: 100px;
-    box-sizing: border-box; /* Evita que el borde sume tamaño extra a la celda */
-    border: 2px solid #ffccd5;
-}        .strip { width: 100%; height: 15px; background: #ff80bf; position: absolute; top: 0; border-top-left-radius: 8px; border-top-right-radius: 8px; }
+         .board { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(5, 100px); gap: 8px; background: #ffccd5; padding: 15px; border-radius: 25px; position: relative; }
+        .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; cursor: pointer; }
+        .strip { width: 100%; height: 15px; background: #ff80bf; position: absolute; top: 0; border-top-left-radius: 8px; border-top-right-radius: 8px; }
         .house-container { position: absolute; bottom: 5px; display: flex; gap: 2px; }
         .house { width: 10px; height: 10px; background: #ff59aa; }
         .hotel { width: 30px; height: 10px; background: #c71585; }
@@ -498,3 +484,4 @@
         d.innerHTML = `<div class="strip"></div>${m.n}<br>${m.p > 0 ? '$'+m.p : ''}<div class="house-container"></div>`; 
         document.getElementById('board').appendChild(d); 
     });</script></body></html>
+
