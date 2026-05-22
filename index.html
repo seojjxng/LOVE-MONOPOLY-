@@ -224,7 +224,12 @@
         });
         if(s.propiedades) { Object.keys(s.propiedades).forEach(pos => { document.getElementById('cell-' + pos).style.backgroundColor = colores[s.propiedades[pos].owner]; }); }
         if(s.chat) { let h = ""; Object.values(s.chat).forEach(c => h += "<b>"+c.n+":</b> "+c.m+"<br>"); document.getElementById('chat-log').innerHTML = h; }
-        if(s.log) { let h = ""; Object.values(s.log).forEach(l => h += l + "<br>"); document.getElementById('log').innerHTML = h; }
+        if(s.log) { 
+            let h = ""; 
+            Object.values(s.log).forEach(l => h += l + "<br>"); 
+            document.getElementById('log').innerHTML = h;
+            document.getElementById('log').scrollTop = document.getElementById('log').scrollHeight;
+        }
     }); }
 
     mapa.forEach((m, i) => { const d = document.createElement('div'); d.className = 'cell'; d.id = 'cell-' + i; d.innerHTML = `${m.n}<br>${m.p > 0 ? '$'+m.p : ''}`; document.getElementById('board').appendChild(d); });
