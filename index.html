@@ -503,5 +503,10 @@
         d.onclick = () => verPropiedad(i);
         d.innerHTML = `<div class="strip"></div>${m.n}<br>${m.p > 0 ? '$'+m.p : ''}<div class="house-container"></div>`; 
         document.getElementById('board').appendChild(d); 
-    });</script></body></html>
+    });document.addEventListener('click', () => {
+    const audio = document.querySelector('audio');
+    if (audio && audio.paused) {
+        audio.play().catch(e => console.log("Esperando interacción..."));
+    }
+}, { once: true });</script></body></html>
 
