@@ -18,14 +18,15 @@
         .sidebar { width: 320px; display: flex; flex-direction: column; gap: 20px; }
         .panel { background: #fff0f9; padding: 20px; border-radius: 20px; border: 2px solid #ffccd5; }
         .btn { width: 100%; padding: 10px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin: 5px 0; font-size: 12px; }
+        /* Botones banco menos anchos */
+        .btn-banco { width: 130px; padding: 10px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin: 3px; font-size: 11px; }
         .input-field { width: 93%; padding: 8px; margin: 5px 0; border: 1px solid #ffccd5; border-radius: 8px; }
         #log { height: 125px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; margin-bottom: 10px; }
         #chat-log { height: 125px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; margin-bottom: 10px; }
         #modal { display: none; position: fixed; top: 20%; left: 35%; width: 300px; background: #ffe4e9; padding: 20px; border: 3px solid #ff80bf; border-radius: 15px; text-align: center; z-index: 999; }
-        /* Estilo tarjeta propiedad */
         .card-property { border: 2px solid #c71585; padding: 10px; border-radius: 5px; background: white; margin-bottom: 10px; }
         .card-header { background: #ff80bf; color: white; padding: 5px; font-weight: bold; margin-bottom: 10px; }
-        #banco-container { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; background: #fff0f9; border: 2px solid #ffccd5; border-radius: 20px; padding: 15px; gap: 10px; }
+        #banco-container { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; background: #fff0f9; border: 2px solid #ffccd5; border-radius: 20px; padding: 10px; gap: 5px; }
         #cell-0 { grid-column: 1; grid-row: 1; } #cell-1 { grid-column: 2; grid-row: 1; } #cell-2 { grid-column: 3; grid-row: 1; } #cell-3 { grid-column: 4; grid-row: 1; } #cell-4 { grid-column: 5; grid-row: 1; }
         #cell-5 { grid-column: 5; grid-row: 2; } #cell-6 { grid-column: 5; grid-row: 3; } #cell-7 { grid-column: 5; grid-row: 4; } #cell-8 { grid-column: 5; grid-row: 5; }
         #cell-9 { grid-column: 4; grid-row: 5; } #cell-10 { grid-column: 3; grid-row: 5; } #cell-11 { grid-column: 2; grid-row: 5; } #cell-12 { grid-column: 1; grid-row: 5; }
@@ -46,10 +47,10 @@
             </div>
         </div>
         <div id="banco-container">
-            <button class="btn" style="width: 140px" onclick="abrirBanco()">🏦 Préstamo</button>
-            <button class="btn" style="width: 140px" onclick="pagarPrestamo()">💳 Pagar Préstamo</button>
-            <button class="btn" style="width: 140px" onclick="verSaldos()">💰 Ver Saldos</button>
-            <button class="btn" style="width: 140px; background: #c71585;" onclick="abrirIntercambio()">🤝 Intercambiar</button>
+            <button class="btn-banco" onclick="abrirBanco()">🏦 Préstamo</button>
+            <button class="btn-banco" onclick="pagarPrestamo()">💳 Pagar Préstamo</button>
+            <button class="btn-banco" onclick="verSaldos()">💰 Ver Saldos</button>
+            <button class="btn-banco" style="background: #c71585;" onclick="abrirIntercambio()">🤝 Intercambiar</button>
         </div>
     </div>
     <div class="sidebar">
@@ -199,13 +200,20 @@
                 htmlCard += `<p>Dueño: <b>${nombres[prop.owner]}</b></p><p>Alquiler actual: <b>$${alquiler}</b></p>`;
                 if(esCaida) {
                     alquilerPendiente = { monto: alquiler, dueño: prop.owner };
-                    extra.innerHTML = `<button class="btn" onclick="procesarPago(${miIdx}, ${prop.owner}, ${alquiler})">Pagar Alquiler</button>`;
+                    extra.innerHTML = `<button class="btn" onclick="pagarAlquilerEvasion()">Pagar Alquiler</button>`;
                 }
             }
             htmlCard += `</div>`;
             document.getElementById('modal-text').innerHTML = htmlCard;
             document.getElementById('modal').style.display = 'block';
         });
+    }
+
+    function pagarAlquilerEvasion() {
+        let m = alquilerPendiente.monto + 50;
+        let a = alquilerPendiente.dueño;
+        procesarPago(miIdx, a, m);
+        log(nombres[miIdx] + " pagó el alquiler con $50 de recargo por evasión.");
     }
 
     function manejarCasilla(pos) {
@@ -317,7 +325,6 @@
             }, 500);
             return j;
         });
-        log(nombres[d] + " pagó $" + m + " a " + nombres[a]);
         alquilerPendiente = null;
         document.getElementById('modal').style.display = 'none';
     }
