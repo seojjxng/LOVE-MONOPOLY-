@@ -89,9 +89,9 @@
         sala = document.getElementById('sala-id').value; 
         db.ref('salas/' + sala + '/jugadores').once('value', snap => { 
             miIdx = snap.numChildren(); 
-            db.ref('salas/' + sala + '/jugadores/' + miIdx).set({ pos: 0, dinero: 1000, deuda: 0, pausasDeuda: 0, enCarcel: 0 }); 
+            db.ref('salas/' + sala + '/jugadores/' + miIdx).set({ pos: 0, dinero: 1000, enCarcel: 0, turnosCarcel: 0 }); 
             if(miIdx == 0) db.ref('salas/' + sala + '/turno').set(0); 
-            db.ref('salas/' + sala + '/chat').push({ n: "Sistema", m: nombres[miIdx] + " ha entrado a la sala." });
+            db.ref('salas/' + sala + '/chat').push({ n: "Sistema", m: nombres[miIdx] + " ha entrado." });
             sincronizar(); 
         }); 
     }
@@ -100,11 +100,11 @@
         let p = mapa[pos];
         let extra = document.getElementById('modal-extra'); extra.innerHTML = "";
         if (p.n === "A LA CÁRCEL" || p.n === "CÁRCEL") {
-            db.ref('salas/'+sala+'/jugadores/'+miIdx).update({pos: 11, enCarcel: 1});
-            log(nombres[miIdx] + " terminó en la cárcel.");
+            db.ref('salas/'+sala+'/jugadores/'+miIdx).update({pos: 11, enCarcel: 1, turnosCarcel: 2});
+            log(nombres[miIdx] + " está en la cárcel por 2 turnos.");
             document.getElementById('modal-title').innerText = "Cárcel";
-            document.getElementById('modal-text').innerText = "Estás bajo arresto. ¿Pagar $100 de fianza?";
-            extra.innerHTML = `<button class="btn" onclick="pagarFianza()">Pagar Fianza</button><button class="btn" onclick="cerrarConInteres()">No pagar</button>`;
+            document.getElementById('modal-text').innerText = "Estás arrestado. Paga $100 de fianza o espera 2 turnos.";
+            extra.innerHTML = `<button class="btn" onclick="pagarFianza()">Pagar Fianza ($100)</button>`;
             document.getElementById('modal').style.display = 'block';
             return;
         }
@@ -123,27 +123,28 @@
             let prop = snap.val();
             document.getElementById('modal-title').innerText = p.n;
             if (!prop) {
-                document.getElementById('modal-text').innerText = "Precio: $" + p.p;
+                document.getElementById('modal-text').innerText = "Precio: $" + p.p + ". Las mejoras cuestan $50 cada una.";
                 extra.innerHTML = `<button class="btn" onclick="comprar(${pos})">Comprar</button>`;
             } else if (prop.owner === miIdx) {
-                const niveles = ["Ninguna", "1 Casa", "2 Casas", "3 Casas", "4 Casas", "Hotel"];
-                document.getElementById('modal-text').innerText = "Nivel: " + niveles[prop.nivel || 0];
-                if (prop.nivel < 5) extra.innerHTML = `<button class="btn" onclick="mejorar(${pos})">Mejorar (Precio + $50)</button>`;
+                let n = prop.nivel || 0;
+                let nombresNivel = ["(Base)", "1 Casa", "2 Casas", "3 Casas", "4 Casas", "Hotel"];
+                document.getElementById('modal-text').innerText = "Nivel actual: " + nombresNivel[n];
+                if (n < 5) extra.innerHTML = `<button class="btn" onclick="mejorar(${pos})">Mejorar por $50</button>`;
             } else {
-                let porcentajes = [0.10, 0.15, 0.20, 0.30, 0.40, 0.50];
-                let alquiler = Math.floor(p.p * porcentajes[prop.nivel || 0]);
+                let tasas = [0.10, 0.15, 0.20, 0.30, 0.40, 0.50];
+                let alquiler = Math.floor(p.p * tasas[prop.nivel || 0]);
                 alquilerPendiente = { monto: alquiler, dueño: prop.owner };
-                document.getElementById('modal-text').innerText = "Alquiler: $" + alquiler;
-                extra.innerHTML = `<button class="btn" onclick="procesarPago(${miIdx}, ${prop.owner}, ${alquiler})">Pagar</button>`;
+                document.getElementById('modal-text').innerText = "Alquiler actual: $" + alquiler;
+                extra.innerHTML = `<button class="btn" onclick="procesarPago(${miIdx}, ${prop.owner}, ${alquiler}); alquilerPendiente=null; document.getElementById('modal').style.display='none'">Pagar</button>`;
             }
             document.getElementById('modal').style.display = 'block';
         });
     }
 
     function pagarFianza() {
-        db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ enCarcel: 0 });
+        db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ enCarcel: 0, turnosCarcel: 0 });
         db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => Number(d) - 100);
-        log(nombres[miIdx] + " pagó $100 de fianza.");
+        log(nombres[miIdx] + " pagó fianza.");
         document.getElementById('modal').style.display = 'none';
     }
 
@@ -158,10 +159,10 @@
     }
 
     function cerrarConInteres() {
-        if(alquilerPendiente) {
+        if (alquilerPendiente) {
             let multa = alquilerPendiente.monto + 50;
             db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => Number(d) - multa);
-            log(nombres[miIdx] + " evadió deuda y pagó $" + multa + " con penalización.");
+            log(nombres[miIdx] + " evadió deuda. Pagó: $" + multa);
             alquilerPendiente = null;
         }
         document.getElementById('modal').style.display = 'none';
@@ -175,8 +176,6 @@
             return j;
         });
         log(nombres[d] + " pagó $" + m + " a " + nombres[a]);
-        alquilerPendiente = null;
-        document.getElementById('modal').style.display = 'none';
     }
 
     function comprar(pos) { log(nombres[miIdx] + " compró " + mapa[pos].n); db.ref('salas/' + sala + '/propiedades/' + pos).set({owner: miIdx, nivel: 0}); db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => Number(d) - Number(mapa[pos].p)); document.getElementById('modal').style.display = 'none'; }
@@ -186,10 +185,19 @@
         if(miIdx === -1) return;
         db.ref('salas/' + sala).once('value', snap => {
             let s = snap.val(); if(s.turno !== miIdx) return;
-            if(s.jugadores[miIdx].enCarcel) { 
+            
+            if(s.jugadores[miIdx].enCarcel) {
+                if(s.jugadores[miIdx].turnosCarcel > 1) {
+                    db.ref('salas/' + sala + '/jugadores/' + miIdx + '/turnosCarcel').transaction(n => n - 1);
+                    log(nombres[miIdx] + " sigue en prisión.");
+                } else {
+                    db.ref('salas/' + sala + '/jugadores/' + miIdx).update({enCarcel: 0, turnosCarcel: 0});
+                    log(nombres[miIdx] + " salió de prisión.");
+                }
                 db.ref('salas/' + sala + '/turno').set((Number(s.turno) + 1) % s.jugadores.length);
-                return; 
+                return;
             }
+
             let val = Math.floor(Math.random()*6)+1;
             document.getElementById('dado-valor').innerText = val;
             let posActual = Number(s.jugadores[miIdx].pos);
@@ -197,9 +205,7 @@
             
             if (nuevaPos < posActual) {
                 db.ref('salas/'+sala+'/jugadores/'+miIdx+'/dinero').transaction(d => d + 200);
-                log(nombres[miIdx] + " pasó por SALIDA y recibió $200.");
             }
-            
             db.ref('salas/' + sala + '/jugadores/' + miIdx + '/pos').set(nuevaPos);
             db.ref('salas/' + sala + '/turno').set((Number(s.turno) + 1) % s.jugadores.length);
             setTimeout(() => manejarCasilla(nuevaPos), 600);
