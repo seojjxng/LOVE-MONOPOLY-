@@ -443,6 +443,7 @@
                         tienePrestamo: false, 
                         montoPrestamo: 0 
                     });
+}
                     log(nombres[miIdx] + " liquidó su préstamo.");
                 } else {
                     document.getElementById('modal-title').innerText = "Fondos insuficientes";
@@ -468,7 +469,7 @@
             document.getElementById('modal-text').innerHTML = txt; 
             document.getElementById('modal').style.display = 'block'; 
         }); 
-    }
+}
     
     function enviarChat() { let msg = document.getElementById('chat-msg').value; db.ref('salas/' + sala + '/chat').push({ n: nombres[miIdx], m: msg }); document.getElementById('chat-msg').value = ""; }
     
