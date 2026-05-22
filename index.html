@@ -32,7 +32,23 @@
         #cell-5 { grid-column: 5; grid-row: 2; } #cell-6 { grid-column: 5; grid-row: 3; } #cell-7 { grid-column: 5; grid-row: 4; } #cell-8 { grid-column: 5; grid-row: 5; }
         #cell-9 { grid-column: 4; grid-row: 5; } #cell-10 { grid-column: 3; grid-row: 5; } #cell-11 { grid-column: 2; grid-row: 5; } #cell-12 { grid-column: 1; grid-row: 5; }
         #cell-13 { grid-column: 1; grid-row: 4; } #cell-14 { grid-column: 1; grid-row: 3; } #cell-15 { grid-column: 1; grid-row: 2; }
-    </style></head><body><audio loop autoplay>
+    </style></head><body><div id="modal">
+    <h3 id="modal-title"></h3>
+    <div id="modal-text"></div>
+    <div id="modal-extra"></div>
+    <button class="btn" id="btn-cerrar" onclick="cerrarModal()">Cerrar</button>
+</div>
+
+<!-- AQUÍ PONES EL NUEVO MODAL DE DEDICATORIA: -->
+<div id="dedicatoria-modal" style="display: flex; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 240, 243, 0.8); z-index: 1000; justify-content: center; align-items: center;">
+    <div style="background: white; padding: 30px; border-radius: 20px; border: 2px solid #ff80bf; text-align: center; position: relative; width: 300px; color: #c71585;">
+        <span onclick="document.getElementById('dedicatoria-modal').style.display='none'" style="position: absolute; top: 10px; right: 15px; cursor: pointer; font-size: 20px; font-weight: bold;">&times;</span>
+        <p style="font-family: 'Montserrat', sans-serif; font-size: 16px; font-style: italic;">
+            "A Naeun, la fuente de inspiración de todo lo que hago."
+        </p>
+        <p style="font-weight: bold;">- Seojun</p>
+    </div>
+</div><audio loop autoplay>
     <source src="https://dl.dropbox.com/scl/fi/5oxzgnxoe30zqd4m6hdfh/kawaii-playlist-for-snack-time-BGM-POP.mp3?rlkey=1lw76u3u1w1ck3dj2ej5x7ml7&st=y6j07iwx&dl=1" type="audio/mpeg"></audio><div class="container">
     <div class="game-column">
         <div class="board" id="board">
