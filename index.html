@@ -24,7 +24,7 @@
         #log { height: 125px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; margin-bottom: 10px; }
         #chat-log { height: 125px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; margin-bottom: 10px; }
         #modal { display: none; position: fixed; top: 20%; left: 35%; width: 300px; background: #ffe4e9; padding: 20px; border: 3px solid #ff80bf; border-radius: 15px; text-align: center; z-index: 999; }
-        #banco-container { display: flex; align-items: center; justify-content: center; background: #fff0f9; border: 2px solid #ffccd5; border-radius: 20px; padding: 15px; gap: 20px; }
+        #banco-container { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; background: #fff0f9; border: 2px solid #ffccd5; border-radius: 20px; padding: 15px; gap: 10px; }
         #cell-0 { grid-column: 1; grid-row: 1; } #cell-1 { grid-column: 2; grid-row: 1; } #cell-2 { grid-column: 3; grid-row: 1; } #cell-3 { grid-column: 4; grid-row: 1; } #cell-4 { grid-column: 5; grid-row: 1; }
         #cell-5 { grid-column: 5; grid-row: 2; } #cell-6 { grid-column: 5; grid-row: 3; } #cell-7 { grid-column: 5; grid-row: 4; } #cell-8 { grid-column: 5; grid-row: 5; }
         #cell-9 { grid-column: 4; grid-row: 5; } #cell-10 { grid-column: 3; grid-row: 5; } #cell-11 { grid-column: 2; grid-row: 5; } #cell-12 { grid-column: 1; grid-row: 5; }
@@ -52,9 +52,10 @@
             </div>
         </div>
         <div id="banco-container">
-            <button class="btn" style="width: 150px" onclick="abrirBanco()">🏦 Préstamo</button>
-            <button class="btn" style="width: 150px" onclick="pagarPrestamo()">💳 Pagar Préstamo</button>
-            <button class="btn" style="width: 150px" onclick="verSaldos()">💰 Ver Saldos</button>
+            <button class="btn" style="width: 140px" onclick="abrirBanco()">🏦 Préstamo</button>
+            <button class="btn" style="width: 140px" onclick="pagarPrestamo()">💳 Pagar Préstamo</button>
+            <button class="btn" style="width: 140px" onclick="verSaldos()">💰 Ver Saldos</button>
+            <button class="btn" style="width: 140px; background: #c71585;" onclick="abrirIntercambio()">🤝 Intercambiar</button>
         </div>
     </div>
     <div class="sidebar">
@@ -119,6 +120,13 @@
                 }
             });
         }
+    }
+
+    function abrirIntercambio() {
+        document.getElementById('modal-title').innerText = "Intercambio";
+        document.getElementById('modal-text').innerText = "Comunícate con otro jugador por el chat para acordar un trato. Esta función está habilitada para propuestas directas.";
+        document.getElementById('modal-extra').innerHTML = `<button class="btn" onclick="document.getElementById('modal').style.display='none'">Entendido</button>`;
+        document.getElementById('modal').style.display = 'block';
     }
 
     function manejarCasilla(pos) {
