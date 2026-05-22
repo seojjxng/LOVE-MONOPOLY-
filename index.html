@@ -284,7 +284,7 @@
                 let nuevoTurno = (t + 1) % total;
                 db.ref('salas/'+sala+'/jugadores/'+nuevoTurno).once('value', jSnap => {
                     let jugador = jSnap.val();
-                    if(jugador.enCarcel > 0) {
+                    if(jSnap.enCarcel > 0) {
                     log(nombres[nuevoTurno] + " está en la cárcel y pierde el turno.");
                         db.ref('salas/'+sala+'/jugadores/'+nuevoTurno).update({
                         enCarcel: jugador.enCarcel - 1
