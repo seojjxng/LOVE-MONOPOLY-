@@ -255,7 +255,7 @@
             pasarTurno();
             return;
         }
-        if (p.n === "?" || p.n === "ARCA") { ejecutarEvento(); return; }
+        if (p.n === "?" || p.n === "ARCA") { ejecutarEvento(p.n); return; }
         if (p.n === "IMPUESTOS") {
             db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => {
                 let nuevo = Number(d) - 100;
