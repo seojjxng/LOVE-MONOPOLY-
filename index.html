@@ -12,21 +12,14 @@
         .board { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(5, 100px); gap: 8px; background: #ffccd5; padding: 15px; border-radius: 25px; position: relative; }
         .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; }
         .center-zone { grid-column: 2 / 5; grid-row: 2 / 5; background: #fff5f7; border: 3px dashed #ff80bf; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        
-        /* Contenedor de botones fijo debajo del tablero */
         .bottom-controls { display: flex; justify-content: center; gap: 10px; padding: 15px; background: #fff0f9; border-radius: 20px; border: 2px solid #ffccd5; }
-        
         .sidebar { width: 300px; display: flex; flex-direction: column; gap: 15px; }
         .panel { background: #fff0f9; padding: 15px; border-radius: 20px; border: 2px solid #ffccd5; }
         .btn { padding: 10px 20px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; }
         .input-field { width: 90%; padding: 8px; margin-bottom: 5px; border: 1px solid #ffccd5; border-radius: 8px; }
         #log, #chat-log { height: 120px; overflow-y: auto; font-size: 10px; background: white; padding: 5px; margin-bottom: 5px; border: 1px solid #ffccd5; }
         #modal { display: none; position: fixed; top: 20%; left: 35%; width: 300px; background: #ffe4e9; padding: 20px; border: 3px solid #ff80bf; border-radius: 15px; z-index: 999; }
-        
-        #cell-0 { grid-column: 1; grid-row: 1; } #cell-1 { grid-column: 2; grid-row: 1; } #cell-2 { grid-column: 3; grid-row: 1; } #cell-3 { grid-column: 4; grid-row: 1; } #cell-4 { grid-column: 5; grid-row: 1; }
-        #cell-5 { grid-column: 5; grid-row: 2; } #cell-6 { grid-column: 5; grid-row: 3; } #cell-7 { grid-column: 5; grid-row: 4; } #cell-8 { grid-column: 5; grid-row: 5; }
-        #cell-9 { grid-column: 4; grid-row: 5; } #cell-10 { grid-column: 3; grid-row: 5; } #cell-11 { grid-column: 2; grid-row: 5; } #cell-12 { grid-column: 1; grid-row: 5; }
-        #cell-13 { grid-column: 1; grid-row: 4; } #cell-14 { grid-column: 1; grid-row: 3; } #cell-15 { grid-column: 1; grid-row: 2; }
+        #dado-display { font-size: 40px; font-weight: bold; color: #ff59aa; margin: 10px 0; }
     </style>
 </head>
 <body>
@@ -36,16 +29,15 @@
         <div class="board" id="board">
             <div class="center-zone">
                 <div id="turno-text" style="font-weight:bold;">ESPERANDO...</div>
+                <div id="dado-display">0</div>
                 <button class="btn" onclick="tirarDado()">Tirar Dado</button>
                 <div>💖 $<span id="dinero-mio">1000</span></div>
             </div>
         </div>
-        <!-- Botones separados debajo del tablero -->
         <div class="bottom-controls">
             <button class="btn" onclick="abrirBanco()">🏦 Banco</button>
             <button class="btn" onclick="verSaldos()">💰 Ver Saldos</button>
         </div>
-        <p style="font-size:10px; color:#c71585; text-align:center;">Nota: El banco retiene 50% de deuda automática al pasar por salida o pagar rentas.</p>
     </div>
 
     <div class="sidebar">
@@ -74,37 +66,80 @@
     const mapa = [{n:"SALIDA",p:0},{n:"IGLESIA",p:100},{n:"?",p:0},{n:"BOUTIQUE",p:200},{n:"CÁRCEL",p:0},{n:"SEOUL",p:500},{n:"GANGNAM",p:520},{n:"JEJU",p:250},{n:"BUSAN",p:300},{n:"INCHEON",p:350},{n:"JOYAS",p:400},{n:"PARKING",p:0},{n:"IMPUESTOS",p:150},{n:"?",p:0},{n:"ARCA",p:0},{n:"BUKCHON",p:500}];
 
     function log(txt) { db.ref('salas/'+sala+'/log').push(txt); }
-    function unirse() { sala = document.getElementById('sala-id').value; db.ref('salas/'+sala+'/jugadores').once('value', s => { miIdx = s.numChildren(); db.ref('salas/'+sala+'/jugadores/'+miIdx).set({pos:0, dinero:1000, deuda:0}); sincronizar(); }); }
+    
+    function unirse() {
+        sala = document.getElementById('sala-id').value;
+        if(!sala) return;
+        const ref = db.ref('salas/'+sala+'/jugadores');
+        ref.once('value', s => {
+            miIdx = s.numChildren();
+            db.ref('salas/'+sala+'/jugadores/'+miIdx).set({pos:0, dinero:1000, deuda:0});
+            if(miIdx === 0) db.ref('salas/'+sala+'/turno').set(0);
+            sincronizar();
+        });
+    }
+
     function tirarDado() {
+        if(miIdx === -1) return;
+        let val = Math.floor(Math.random()*6)+1;
+        document.getElementById('dado-display').innerText = val;
         db.ref('salas/'+sala).once('value', s => {
             let j = s.val().jugadores[miIdx];
-            let val = Math.floor(Math.random()*6)+1;
             let pos = (j.pos + val) % mapa.length;
-            if(pos < j.pos) { // Pasó por salida
+            if(pos < j.pos) { 
                 let cobro = Math.min(j.deuda, 50);
                 db.ref('salas/'+sala+'/jugadores/'+miIdx).update({dinero: j.dinero + 100 - cobro, deuda: j.deuda - cobro});
-                log(nombres[miIdx]+" pasó por SALIDA. Recibió $100 (Banco descontó $"+cobro+" de deuda)");
             }
             db.ref('salas/'+sala+'/jugadores/'+miIdx+'/pos').set(pos);
             db.ref('salas/'+sala+'/turno').set((s.val().turno + 1) % 4);
         });
     }
+
+    function verSaldos() {
+        db.ref('salas/'+sala+'/jugadores').once('value', s => {
+            let txt = "Saldos:<br>";
+            s.forEach(c => txt += nombres[c.key] + ": $" + c.val().dinero + "<br>");
+            document.getElementById('modal-title').innerText = "Finanzas";
+            document.getElementById('modal-text').innerHTML = txt;
+            document.getElementById('modal').style.display = 'block';
+        });
+    }
+
     function abrirBanco() {
         document.getElementById('modal-title').innerText = "Banco";
         let div = document.getElementById('modal-extra'); div.innerHTML = "";
         [200, 500, 1000].forEach(m => {
-            let b = document.createElement('button'); b.className = 'btn'; b.innerText = "Préstamo $"+m;
+            let b = document.createElement('button'); b.className = 'btn'; b.innerText = "$"+m;
             b.onclick = () => { db.ref('salas/'+sala+'/jugadores/'+miIdx).transaction(j => { j.dinero+=m; j.deuda+=m; return j; }); document.getElementById('modal').style.display='none'; };
             div.appendChild(b);
         });
         document.getElementById('modal').style.display = 'block';
     }
+
     function enviarChat() {
         let msg = document.getElementById('chat-msg').value;
         db.ref('salas/'+sala+'/chat').push({n: nombres[miIdx], m: msg, t: new Date().toLocaleTimeString()});
+        document.getElementById('chat-msg').value = "";
     }
+
+    function sincronizar() {
+        db.ref('salas/'+sala).on('value', s => {
+            let d = s.val();
+            if(!d) return;
+            document.getElementById('dinero-mio').innerText = d.jugadores[miIdx].dinero;
+            document.getElementById('turno-text').innerText = "Turno: " + nombres[d.turno];
+            if(d.chat) {
+                let h = ""; Object.values(d.chat).forEach(c => h += `<div>[${c.t}] <b>${c.n}</b>: ${c.m}</div>`);
+                document.getElementById('chat-log').innerHTML = h;
+            }
+            if(d.log) {
+                let h = ""; Object.values(d.log).forEach(l => h += `<div>${l}</div>`);
+                document.getElementById('log').innerHTML = h;
+            }
+        });
+    }
+
     mapa.forEach((m, i) => { const d = document.createElement('div'); d.className = 'cell'; d.id = 'cell-'+i; d.innerHTML = `${m.n}<br>${m.p > 0 ? '$'+m.p : ''}`; document.getElementById('board').appendChild(d); });
-    function sincronizar() { db.ref('salas/'+sala).on('value', s => { let data = s.val(); if(!data) return; if(data.chat) { let h = ""; Object.values(data.chat).forEach(c => h += `<div>[${c.t}] <b>${c.n}</b>: ${c.m}</div>`); document.getElementById('chat-log').innerHTML = h; } }); }
 </script>
 </body>
 </html>
