@@ -70,44 +70,74 @@
     }
 
     function tirarDado() {
-        db.ref('salas/'+sala).once('value', snap => {
+        if(miIdx === -1) return;
+        db.ref('salas/' + sala).once('value', snap => {
             let s = snap.val();
-            if(s.turno !== miIdx || s.jugadores[miIdx].encarcelado) return;
-            let val = Math.floor(Math.random()*6)+1;
-            let nuevaPos = (s.jugadores[miIdx].pos + val) % 16;
+            if(s.turno !== miIdx) return;
             
-            // Lógica de casilla
-            if(nuevaPos == 12) { // IMPUESTOS
-                db.ref('salas/'+sala+'/jugadores/'+miIdx+'/dinero').transaction(d => d - 150);
-                db.ref('salas/'+sala+'/log').push("Jugador " + miIdx + " pagó $150 impuestos.");
-            } else if(nuevaPos == 4 || nuevaPos == 11) { // CARCEL
-                db.ref('salas/'+sala+'/jugadores/'+miIdx).update({pos: 11, encarcelado: true});
-                setTimeout(() => db.ref('salas/'+sala+'/jugadores/'+miIdx+'/encarcelado').set(false), 3000);
-            } else if(nuevaPos == 2 || nuevaPos == 13 || nuevaPos == 14) { // BONIFICACIONES
-                let premio = [200, 300, 500][Math.floor(Math.random()*3)];
-                db.ref('salas/'+sala+'/jugadores/'+miIdx+'/dinero').transaction(d => d + premio);
-                db.ref('salas/'+sala+'/log').push("¡Evento! Ganaste $" + premio);
+            let val = Math.floor(Math.random()*6)+1;
+            document.getElementById('dado-valor').innerText = val;
+            
+            let posActual = s.jugadores[miIdx].pos;
+            let nuevaPos = (posActual + val) % 16;
+            let dinero = s.jugadores[miIdx].dinero;
+            let mensaje = `Moviste ${val} espacios.`;
+
+            // Lógica de Casillas
+            if(nuevaPos === 12) { // IMPUESTOS
+                dinero -= 200;
+                mensaje = "Caíste en IMPUESTOS, pagas $200.";
+            } 
+            else if(nuevaPos === 2 || nuevaPos === 13) { // ? (Pregunta)
+                let bonos = [150, 250, 400];
+                let premio = bonos[Math.floor(Math.random()*bonos.length)];
+                dinero += premio;
+                mensaje = `¡Suerte! Ganaste $${premio} en la casilla ?.`;
+            }
+            else if(nuevaPos === 14) { // ARCA
+                let tesoro = [300, 500, 750];
+                let premio = tesoro[Math.floor(Math.random()*tesoro.length)];
+                dinero += premio;
+                mensaje = `¡Gran descubrimiento en el ARCA! Ganaste $${premio}.`;
+            }
+            else if(nuevaPos === 4) { // A LA CARCEL (sin movimiento, solo penalización)
+                nuevaPos = 11;
+                mensaje = "¡A la cárcel! Pierdes tu próximo turno.";
             }
 
-            db.ref('salas/'+sala+'/jugadores/'+miIdx+'/pos').set(nuevaPos);
-            db.ref('salas/'+sala+'/turno').set((s.turno + 1) % s.jugadores.length);
+            // Actualizar DB
+            db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: nuevaPos, dinero: dinero });
+            db.ref('salas/' + sala + '/log').push(nombres[miIdx] + ": " + mensaje);
+            db.ref('salas/' + sala + '/turno').set((s.turno + 1) % s.jugadores.length);
         });
     }
 
-    function sincronizar() {
-        db.ref('salas/'+sala).on('value', snap => {
-            let s = snap.val();
-            document.getElementById('dinero-mio').innerText = s.jugadores[miIdx].dinero;
-            s.jugadores.forEach((j, i) => {
-                let el = document.getElementById('p'+i);
-                el.style.display = 'block';
-                el.style.left = (coords[j.pos].x + (i*5)) + 'px';
-                el.style.top = (coords[j.pos].y + 5) + 'px';
-            });
+    function sincronizar() { 
+        db.ref('salas/' + sala).on('value', snap => { 
+            let s = snap.val(); 
+            if(!s) return; 
+            
+            document.getElementById('dinero-mio').innerText = s.jugadores[miIdx].dinero; 
+            document.getElementById('turno-text').innerText = "Turno: " + nombres[s.turno]; 
+            
+            // Actualizar historial
             if(s.log) {
-                let html = ""; Object.values(s.log).slice(-5).forEach(l => html += `<div>${l}</div>`);
-                document.getElementById('log').innerHTML = html;
+                let logDiv = document.getElementById('log');
+                logDiv.innerHTML = Object.values(s.log).reverse().map(l => `<div>${l}</div>`).join('');
             }
+
+            s.jugadores.forEach((j, i) => { 
+                let el = document.getElementById('p' + i); 
+                el.style.display = 'block'; 
+                // Inician en coords[0] (Salida) por defecto en Firebase al unirse
+                let pos = coords[j.pos]; 
+                if(pos) { 
+                    el.style.left = (pos.x + (i*8)) + 'px'; // Desplazamiento leve para que no se encimen
+                    el.style.top = (pos.y + 5) + 'px'; 
+                } 
+            }); 
+        }); 
+    }
         });
     }
     
