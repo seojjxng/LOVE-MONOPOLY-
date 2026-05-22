@@ -122,24 +122,34 @@
     function procesarPago(deudorIdx, acreedorIdx, monto) {
         db.ref('salas/' + sala + '/jugadores').transaction(j => {
             if(!j) return;
-            let p = Number(monto);
-            let d = j[deudorIdx];
-            let a = j[acreedorIdx];
-            
-            if(d.deuda > 0) {
-                let ret = Math.min(Number(d.deuda), Math.floor(p * 0.5));
-                d.deuda = Number(d.deuda) - ret;
+            let m = Number(monto);
+            let p = m;
+            if(Number(j[deudorIdx].deuda) > 0) {
+                let ret = Math.min(Number(j[deudorIdx].deuda), Math.floor(p * 0.5));
+                j[deudorIdx].deuda = Number(j[deudorIdx].deuda) - ret;
                 p -= ret;
             }
-            d.dinero = Number(d.dinero) - Number(monto);
-            a.dinero = Number(a.dinero) + p;
+            j[deudorIdx].dinero = Number(j[deudorIdx].dinero) - m;
+            j[acreedorIdx].dinero = Number(j[acreedorIdx].dinero) + p;
             return j;
         });
         log(nombres[deudorIdx] + " pagó $" + monto + " a " + nombres[acreedorIdx]);
     }
 
-    function comprar(pos) { db.ref('salas/' + sala + '/propiedades/' + pos).set({owner: miIdx, nivel: 0}); log(nombres[miIdx] + " compró " + mapa[pos].n); document.getElementById('modal').style.display = 'none'; }
-    function mejorar(pos) { db.ref('salas/' + sala + '/propiedades/' + pos + '/nivel').transaction(n => (n || 0) + 1); log(nombres[miIdx] + " mejoró " + mapa[pos].n); document.getElementById('modal').style.display = 'none'; }
+    function comprar(pos) { 
+        db.ref('salas/' + sala + '/propiedades/' + pos).set({owner: miIdx, nivel: 0}); 
+        db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => Number(d) - Number(mapa[pos].p));
+        log(nombres[miIdx] + " compró " + mapa[pos].n); 
+        document.getElementById('modal').style.display = 'none'; 
+    }
+    
+    function mejorar(pos) { 
+        let costo = Number(mapa[pos].p) + 50;
+        db.ref('salas/' + sala + '/propiedades/' + pos + '/nivel').transaction(n => (Number(n) || 0) + 1); 
+        db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => Number(d) - costo);
+        log(nombres[miIdx] + " mejoró " + mapa[pos].n); 
+        document.getElementById('modal').style.display = 'none'; 
+    }
     
     function tirarDado() { 
         if(miIdx === -1) return;
@@ -147,23 +157,44 @@
             let s = snap.val(); if(s.turno !== miIdx) return;
             let val = Math.floor(Math.random()*6)+1;
             document.getElementById('dado-valor').innerText = val;
-            let nuevaPos = s.jugadores[miIdx].pos + val;
+            let nuevaPos = Number(s.jugadores[miIdx].pos) + val;
             if(nuevaPos >= mapa.length) { 
                 nuevaPos %= mapa.length; 
                 db.ref('salas/'+sala+'/jugadores/'+miIdx).transaction(j => {
                     j.dinero = Number(j.dinero) + 200;
-                    if(j.deuda > 0) { let ret = 100; j.deuda = Number(j.deuda) - ret; log("Banco cobró $100 de deuda"); }
+                    if(Number(j.deuda) > 0) { j.deuda = Number(j.deuda) - 100; log("Banco cobró $100 de deuda"); }
                     return j;
                 });
                 log(nombres[miIdx] + " pasó SALIDA y cobró $200");
             }
             db.ref('salas/' + sala + '/jugadores/' + miIdx + '/pos').set(nuevaPos);
-            db.ref('salas/' + sala + '/turno').set((s.turno + 1) % s.jugadores.length);
+            db.ref('salas/' + sala + '/turno').set((Number(s.turno) + 1) % s.jugadores.length);
             setTimeout(() => manejarCasilla(nuevaPos), 600);
         }); 
     }
 
-    function abrirBanco() { document.getElementById('modal-title').innerText = "Banco"; document.getElementById('modal-text').innerText = "Préstamo:"; let div = document.getElementById('modal-extra'); div.innerHTML = ""; [200, 400, 600].forEach(m => { let b = document.createElement('button'); b.className = 'btn'; b.innerText = "$"+m; b.onclick = () => { db.ref('salas/' + sala + '/jugadores/' + miIdx).transaction(j => { if(j) { j.dinero = Number(j.dinero) + m; j.deuda = Number(j.deuda || 0) + m; } return j; }); log(nombres[miIdx] + " pidió préstamo de $" + m); document.getElementById('modal').style.display = 'none'; }; div.appendChild(b); }); document.getElementById('modal').style.display = 'block'; }
+    function abrirBanco() { 
+        document.getElementById('modal-title').innerText = "Banco"; 
+        document.getElementById('modal-text').innerText = "Préstamo:"; 
+        let div = document.getElementById('modal-extra'); 
+        div.innerHTML = ""; 
+        [200, 400, 600].forEach(m => { 
+            let b = document.createElement('button'); 
+            b.className = 'btn'; 
+            b.innerText = "$"+m; 
+            b.onclick = () => { 
+                db.ref('salas/' + sala + '/jugadores/' + miIdx).transaction(j => { 
+                    if(j) { j.dinero = Number(j.dinero) + m; j.deuda = Number(j.deuda || 0) + m; } 
+                    return j; 
+                }); 
+                log(nombres[miIdx] + " pidió préstamo de $" + m); 
+                document.getElementById('modal').style.display = 'none'; 
+            }; 
+            div.appendChild(b); 
+        }); 
+        document.getElementById('modal').style.display = 'block'; 
+    }
+
     function verSaldos() { db.ref('salas/' + sala + '/jugadores').once('value', snap => { let txt = ""; snap.forEach(c => txt += nombres[c.key] + ": $" + c.val().dinero + " (Deuda: $" + c.val().deuda + ")<br>"); document.getElementById('modal-title').innerText = "Saldos"; document.getElementById('modal-text').innerHTML = txt; document.getElementById('modal').style.display = 'block'; }); }
     function enviarChat() { let msg = document.getElementById('chat-msg').value; db.ref('salas/' + sala + '/chat').push({ n: nombres[miIdx], m: msg }); document.getElementById('chat-msg').value = ""; }
     
