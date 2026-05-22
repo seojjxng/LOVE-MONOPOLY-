@@ -126,13 +126,15 @@
                 document.getElementById('modal-text').innerText = "Precio: $" + p.p;
                 extra.innerHTML = `<button class="btn" onclick="comprar(${pos})">Comprar</button>`;
             } else if (prop.owner === miIdx) {
-                document.getElementById('modal-text').innerText = "Nivel: " + (prop.nivel || 0);
-                if (prop.nivel < 5) extra.innerHTML = `<button class="btn" onclick="mejorar(${pos})">Mejorar</button>`;
+                const niveles = ["Ninguna", "1 Casa", "2 Casas", "3 Casas", "4 Casas", "Hotel"];
+                document.getElementById('modal-text').innerText = "Nivel: " + niveles[prop.nivel || 0];
+                if (prop.nivel < 5) extra.innerHTML = `<button class="btn" onclick="mejorar(${pos})">Mejorar (Precio + $50)</button>`;
             } else {
-                let alquiler = Math.floor(p.p * [0.10, 0.15, 0.20, 0.25, 0.30, 0.40][prop.nivel || 0]);
+                let porcentajes = [0.10, 0.15, 0.20, 0.30, 0.40, 0.50];
+                let alquiler = Math.floor(p.p * porcentajes[prop.nivel || 0]);
                 alquilerPendiente = { monto: alquiler, dueño: prop.owner };
                 document.getElementById('modal-text').innerText = "Alquiler: $" + alquiler;
-                extra.innerHTML = `<button class="btn" onclick="procesarPago(${miIdx}, ${prop.owner}, ${alquiler}); alquilerPendiente=null; document.getElementById('modal').style.display='none'">Pagar</button>`;
+                extra.innerHTML = `<button class="btn" onclick="procesarPago(${miIdx}, ${prop.owner}, ${alquiler})">Pagar</button>`;
             }
             document.getElementById('modal').style.display = 'block';
         });
@@ -156,7 +158,12 @@
     }
 
     function cerrarConInteres() {
-        alquilerPendiente = null;
+        if(alquilerPendiente) {
+            let multa = alquilerPendiente.monto + 50;
+            db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => Number(d) - multa);
+            log(nombres[miIdx] + " evadió deuda y pagó $" + multa + " con penalización.");
+            alquilerPendiente = null;
+        }
         document.getElementById('modal').style.display = 'none';
     }
 
@@ -168,6 +175,8 @@
             return j;
         });
         log(nombres[d] + " pagó $" + m + " a " + nombres[a]);
+        alquilerPendiente = null;
+        document.getElementById('modal').style.display = 'none';
     }
 
     function comprar(pos) { log(nombres[miIdx] + " compró " + mapa[pos].n); db.ref('salas/' + sala + '/propiedades/' + pos).set({owner: miIdx, nivel: 0}); db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => Number(d) - Number(mapa[pos].p)); document.getElementById('modal').style.display = 'none'; }
