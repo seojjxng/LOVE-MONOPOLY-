@@ -22,7 +22,6 @@
         #log { height: 125px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; margin-bottom: 10px; }
         #chat-log { height: 125px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; margin-bottom: 10px; }
         #modal { display: none; position: fixed; top: 20%; left: 35%; width: 300px; background: #ffe4e9; padding: 20px; border: 3px solid #ff80bf; border-radius: 15px; text-align: center; z-index: 999; }
-        /* Estilo tarjeta propiedad */
         .card-property { border: 2px solid #c71585; padding: 10px; border-radius: 5px; background: white; margin-bottom: 10px; }
         .card-header { background: #ff80bf; color: white; padding: 5px; font-weight: bold; margin-bottom: 10px; }
         #banco-container { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; background: #fff0f9; border: 2px solid #ffccd5; border-radius: 20px; padding: 15px; gap: 10px; }
@@ -98,9 +97,22 @@
     
     function verificarBancarrota(jugadorIdx, saldo) {
         if (saldo < 0) {
-            log("¡" + nombres[jugadorIdx] + " ha caído en números rojos!");
-            db.ref('salas/' + sala + '/jugadores/' + jugadorIdx).once('value', snap => {
-                if(!snap.val().tienePrestamo) {
+            db.ref('salas/' + sala).once('value', snap => {
+                let data = snap.val();
+                let props = [];
+                if(data.propiedades) {
+                    Object.keys(data.propiedades).forEach(pIdx => {
+                        if(data.propiedades[pIdx].owner == jugadorIdx && !data.propiedades[pIdx].hipotecada) props.push(pIdx);
+                    });
+                }
+                if(props.length > 0) {
+                    let pIdx = props[0];
+                    let valor = Math.floor(mapa[pIdx].p / 2);
+                    db.ref('salas/' + sala + '/propiedades/' + pIdx).update({hipotecada: true});
+                    db.ref('salas/' + sala + '/jugadores/' + jugadorIdx + '/dinero').transaction(d => d + valor);
+                    log(nombres[jugadorIdx] + " hipotecó " + mapa[pIdx].n + " automáticamente para evitar bancarrota.");
+                    setTimeout(() => db.ref('salas/' + sala + '/jugadores/' + jugadorIdx + '/dinero').once('value', s => verificarBancarrota(jugadorIdx, s.val())), 500);
+                } else if(!data.jugadores[jugadorIdx].tienePrestamo) {
                     document.getElementById('modal-title').innerText = "¡Bancarrota!";
                     document.getElementById('modal-text').innerText = "Tu saldo es negativo. ¡Necesitas un préstamo urgente!";
                     document.getElementById('modal-extra').innerHTML = `<button class="btn" onclick="abrirBanco()">Pedir Préstamo</button>`;
@@ -167,7 +179,7 @@
                 }
                 return;
             });
-            db.ref('salas/' + sala + '/propiedades/' + o.prop).update({owner: miIdx});
+            db.ref('salas/' + sala + '/propiedades/' + o.prop).update({owner: miIdx, hipotecada: false});
             log(nombres[miIdx] + " compró " + mapa[o.prop].n + " a " + nombres[o.de]);
             db.ref('salas/' + sala + '/ofertas/' + oKey).remove();
             document.getElementById('modal').style.display = 'none';
@@ -191,13 +203,16 @@
                 htmlCard += `<p>Estado: <b>Disponible</b></p>`;
                 if(esCaida) extra.innerHTML = `<button class="btn" onclick="comprar(${pos})">Comprar</button>`;
             } else if (prop.owner === miIdx) {
-                htmlCard += `<p>Dueño: <b>Tú</b></p><p>Nivel actual: <b>${niveles[prop.nivel || 0]}</b></p>`;
-                if (prop.nivel < 5) extra.innerHTML = `<button class="btn" onclick="mejorar(${pos})">Mejorar (Coste: $50)</button>`;
+                htmlCard += `<p>Dueño: <b>Tú</b></p><p>Nivel actual: <b>${niveles[prop.nivel || 0]}</b></p><p>Hipotecada: <b>${prop.hipotecada ? "SÍ" : "NO"}</b></p>`;
+                if (!prop.hipotecada) {
+                    if (prop.nivel < 5) extra.innerHTML = `<button class="btn" onclick="mejorar(${pos})">Mejorar (Coste: $50)</button>`;
+                    extra.innerHTML += `<button class="btn" style="background:#888" onclick="hipotecar(${pos})">Hipotecar ($${Math.floor(p.p/2)})</button>`;
+                }
             } else {
                 let porcentajes = [0.10, 0.15, 0.20, 0.30, 0.40, 0.50];
-                let alquiler = Math.floor(p.p * porcentajes[prop.nivel || 0]);
-                htmlCard += `<p>Dueño: <b>${nombres[prop.owner]}</b></p><p>Alquiler actual: <b>$${alquiler}</b></p>`;
-                if(esCaida) {
+                let alquiler = prop.hipotecada ? 0 : Math.floor(p.p * porcentajes[prop.nivel || 0]);
+                htmlCard += `<p>Dueño: <b>${nombres[prop.owner]}</b></p><p>Alquiler actual: <b>$${alquiler}</b></p>${prop.hipotecada ? "<p style='color:red'>HIPOTECADA</p>" : ""}`;
+                if(esCaida && !prop.hipotecada) {
                     alquilerPendiente = { monto: alquiler, dueño: prop.owner };
                     extra.innerHTML = `<button class="btn" onclick="procesarPago(${miIdx}, ${prop.owner}, ${alquiler})">Pagar Alquiler</button>`;
                 }
@@ -206,6 +221,14 @@
             document.getElementById('modal-text').innerHTML = htmlCard;
             document.getElementById('modal').style.display = 'block';
         });
+    }
+
+    function hipotecar(pos) {
+        let valor = Math.floor(mapa[pos].p / 2);
+        db.ref('salas/' + sala + '/propiedades/' + pos).update({hipotecada: true});
+        db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d + valor);
+        log(nombres[miIdx] + " hipotecó " + mapa[pos].n + " por $" + valor);
+        document.getElementById('modal').style.display = 'none';
     }
 
     function manejarCasilla(pos) {
@@ -322,7 +345,7 @@
         document.getElementById('modal').style.display = 'none';
     }
 
-    function comprar(pos) { log(nombres[miIdx] + " compró " + mapa[pos].n); db.ref('salas/' + sala + '/propiedades/' + pos).set({owner: miIdx, nivel: 0}); db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => Number(d) - Number(mapa[pos].p)); document.getElementById('modal').style.display = 'none'; }
+    function comprar(pos) { log(nombres[miIdx] + " compró " + mapa[pos].n); db.ref('salas/' + sala + '/propiedades/' + pos).set({owner: miIdx, nivel: 0, hipotecada: false}); db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => Number(d) - Number(mapa[pos].p)); document.getElementById('modal').style.display = 'none'; }
     function mejorar(pos) { log(nombres[miIdx] + " mejoró " + mapa[pos].n); db.ref('salas/' + sala + '/propiedades/' + pos + '/nivel').transaction(n => (Number(n) || 0) + 1); db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => Number(d) - 50); document.getElementById('modal').style.display = 'none'; }
     
     function tirarDado() { 
@@ -435,7 +458,7 @@
             });
             if(s.propiedades) { Object.keys(s.propiedades).forEach(pos => { 
                 let cell = document.getElementById('cell-' + pos);
-                cell.style.backgroundColor = colores[s.propiedades[pos].owner];
+                cell.style.backgroundColor = s.propiedades[pos].hipotecada ? "#ccc" : colores[s.propiedades[pos].owner];
                 
                 let hc = cell.querySelector('.house-container');
                 hc.innerHTML = "";
