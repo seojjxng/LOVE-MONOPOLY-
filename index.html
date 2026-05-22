@@ -124,7 +124,8 @@
             db.ref('salas/'+sala+'/jugadores/'+miIdx).update({pos: 11, enCarcel: 1});
             log(nombres[miIdx] + " fue enviado a la cárcel.");
             document.getElementById('modal-title').innerText = "Cárcel";
-            document.getElementById('modal-text').innerText = "Estás bajo arresto. Pierdes tu próximo turno.";
+            document.getElementById('modal-text').innerText = "¡Tiene derecho a guardar silencio y a un abogado!";
+            extra.innerHTML = `<button class="btn" onclick="pagarFianza()">Pagar Fianza ($100)</button><button class="btn" onclick="quedarseEnCarcel()">Quedarse un turno</button>`;
             document.getElementById('modal').style.display = 'block';
             turnosSeis = 0;
             pasarTurno();
@@ -174,6 +175,17 @@
         });
     }
 
+    function pagarFianza() {
+        db.ref('salas/'+sala+'/jugadores/'+miIdx).update({enCarcel: 0, dinero: firebase.database.ServerValue.increment(-100)});
+        log(nombres[miIdx] + " pagó la fianza y salió de la cárcel.");
+        document.getElementById('modal').style.display = 'none';
+    }
+
+    function quedarseEnCarcel() {
+        log(nombres[miIdx] + " decidió quedarse en la cárcel.");
+        document.getElementById('modal').style.display = 'none';
+    }
+
     function pasarTurno() {
         turnosSeis = 0;
         db.ref('salas/'+sala+'/jugadores').once('value', snap => {
@@ -181,9 +193,11 @@
             db.ref('salas/'+sala+'/turno').once('value', tSnap => {
                 let t = Number(tSnap.val());
                 let nuevoTurno = (t + 1) % total;
+                
                 db.ref('salas/'+sala+'/jugadores/'+nuevoTurno).once('value', jSnap => {
                     if(jSnap.val().enCarcel === 1) {
                          db.ref('salas/'+sala+'/jugadores/'+nuevoTurno).update({enCarcel: 0});
+                         log(nombres[nuevoTurno] + " ha cumplido su condena.");
                          db.ref('salas/'+sala+'/turno').set((nuevoTurno + 1) % total);
                     } else {
                          db.ref('salas/'+sala+'/turno').set(nuevoTurno);
@@ -256,7 +270,8 @@
     function tirarDado() { 
         if(miIdx === -1) return;
         db.ref('salas/' + sala).once('value', snap => {
-            let s = snap.val(); if(s.turno !== miIdx) return;
+            let s = snap.val(); 
+            if(s.turno !== miIdx || s.jugadores[miIdx].enCarcel === 1) return;
             let dado = Math.floor(Math.random()*6)+1;
             document.getElementById('dado-valor').innerText = dado;
             
