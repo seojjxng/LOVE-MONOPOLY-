@@ -382,16 +382,37 @@
     }
 
     function abrirBanco() { 
-        document.getElementById('modal-title').innerText = "Préstamo";
-        document.getElementById('modal-extra').innerHTML = `<button class="btn" onclick="pedirPrestamo(500)">Pedir $500</button>`;
-        document.getElementById('modal').style.display = 'block';
-    }
-
+    const montos = [200, 300, 450, 670, 800, 1000];
+    document.getElementById('modal-title').innerText = "Solicitar Préstamo";
+    let htmlExtra = "";
+    
+    montos.forEach(m => {
+        htmlExtra += `<button class="btn" onclick="pedirPrestamo(${m})">Pedir $${m}</button>`;
+    });
+    
+    document.getElementById('modal-extra').innerHTML = htmlExtra;
+    document.getElementById('modal').style.display = 'block';
+}
     function pedirPrestamo(m) {
-        db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ dinero: firebase.database.ServerValue.increment(m), tienePrestamo: true, montoPrestamo: m });
-        log(nombres[miIdx] + " pidió préstamo.");
-        document.getElementById('modal').style.display = 'none';
-    }
+    db.ref('salas/' + sala + '/jugadores/' + miIdx).once('value', snap => {
+        let jugador = snap.val();
+        
+        // Evita que pidan otro préstamo si ya tienen uno activo
+        if (jugador.tienePrestamo) {
+            alert("Ya tienes un préstamo activo. ¡Págalo primero!");
+            return;
+        }
+        
+        db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ 
+            dinero: firebase.database.ServerValue.increment(m), 
+            tienePrestamo: true, 
+            montoPrestamo: m 
+        });
+        
+        log(nombres[miIdx] + " pidió un préstamo de $" + m);
+        cerrarModal(); // Cierra el modal automáticamente tras pedirlo
+    });
+}
 
     function pagarPrestamo() {
         db.ref('salas/' + sala + '/jugadores/' + miIdx).once('value', snap => {
