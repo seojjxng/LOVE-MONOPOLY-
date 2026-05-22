@@ -167,7 +167,7 @@
     }
 
     function pagarFianza() {
-        db.ref('salas/' + sala + '/jugadores/' + miIdx).set({ pos: 0, dinero: 1000, enCarcel: 0, turnosCarcel: 0 });
+        db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ enCarcel: 0, turnosCarcel: 0 });
         db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => Number(d) - 100);
         log(nombres[miIdx] + " pagó $100 de fianza.");
         document.getElementById('modal').style.display = 'none';
@@ -223,7 +223,7 @@
                 setTimeout(() => verificarBancarrota(miIdx, nuevo), 500);
                 return nuevo;
             });
-            log(nombres[miIdx] + " evadió deuda y pagó $" + multa + " con penalización.");
+            log(nombres[miIdx] + " evadió su deuda y pagó $" + multa + " como penalización.");
             alquilerPendiente = null;
         }
         document.getElementById('modal').style.display = 'none';
