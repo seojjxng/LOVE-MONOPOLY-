@@ -433,7 +433,8 @@
 }
 
     function pagarPrestamo() {
-        document.getElementById('modal-text').innerHTML = "";('salas/' + sala + '/jugadores/' + miIdx).once('value', snap => {
+    document.getElementById('modal-text').innerHTML = "";
+    db.ref('salas/' + sala + '/jugadores/' + miIdx).once('value', snap => {
             let j = snap.val();
             if (j.tienePrestamo) {
                 if (j.dinero >= j.montoPrestamo) {
@@ -459,7 +460,8 @@
     }
     
     function verSaldos() { 
-        document.getElementById('modal-text').innerHTML = "";('salas/' + sala + '/jugadores').once('value', snap => { 
+    document.getElementById('modal-text').innerHTML = "";
+    db.ref('salas/' + sala + '/jugadores').once('value', snap => {
             let txt = ""; 
             snap.forEach(c => { txt += nombres[parseInt(c.key)] + ": $" + c.val().dinero + "<br>"; }); 
             document.getElementById('modal-title').innerText = "Saldos"; 
