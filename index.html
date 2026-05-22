@@ -115,7 +115,11 @@
         if (p.n === "?" || p.n === "ARCA") { ejecutarEvento(); return; }
         if (p.n === "IMPUESTOS") {
             let monto = 200;
-            db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => Number(d) - monto);
+            db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => {
+                let nuevo = Number(d) - monto;
+                if(nuevo <= 0) log(nombres[miIdx] + " ha entrado en QUIEBRA.");
+                return nuevo;
+            });
             log(nombres[miIdx] + " pagó $" + monto + " de impuestos.");
             document.getElementById('modal').style.display = 'block';
             return;
@@ -131,7 +135,7 @@
             } else {
                 let alquiler = Math.floor(p.p * 0.15);
                 alquilerPendiente = { monto: alquiler, dueño: prop.owner };
-                extra.innerHTML = `<button class="btn" onclick="procesarPago(${miIdx}, ${prop.owner}, ${alquiler}); alquilerPendiente=null; document.getElementById('modal').style.display='none'">Pagar</button>`;
+                extra.innerHTML = `<button class="btn" onclick="procesarPago(${miIdx}, ${prop.owner}, ${alquiler}); log(nombres[miIdx]+' pagó $'+alquiler+' de alquiler a '+nombres[prop.owner]); alquilerPendiente=null; document.getElementById('modal').style.display='none'">Pagar</button>`;
             }
             document.getElementById('modal').style.display = 'block';
         });
@@ -167,13 +171,14 @@
         db.ref('salas/' + sala + '/jugadores').transaction(j => {
             if(!j) return;
             j[d].dinero -= m;
+            if(j[d].dinero <= 0) log(nombres[d] + " ha entrado en QUIEBRA.");
             j[a].dinero += m;
             return j;
         });
     }
 
-    function comprar(pos) { db.ref('salas/' + sala + '/propiedades/' + pos).set({owner: miIdx}); log(nombres[miIdx] + " compró propiedad."); document.getElementById('modal').style.display = 'none'; }
-    function mejorar(pos) { db.ref('salas/' + sala + '/propiedades/' + pos + '/nivel').transaction(n => (n||0)+1); log(nombres[miIdx] + " mejoró propiedad."); document.getElementById('modal').style.display = 'none'; }
+    function comprar(pos) { db.ref('salas/' + sala + '/propiedades/' + pos).set({owner: miIdx, nivel: 1}); log(nombres[miIdx] + " compró " + mapa[pos].n); document.getElementById('modal').style.display = 'none'; }
+    function mejorar(pos) { db.ref('salas/' + sala + '/propiedades/' + pos + '/nivel').transaction(n => (n||0)+1); log(nombres[miIdx] + " mejoró " + mapa[pos].n); document.getElementById('modal').style.display = 'none'; }
     
     function tirarDado() { 
         db.ref('salas/' + sala).once('value', snap => {
@@ -197,7 +202,7 @@
 
     function abrirBanco() { 
         db.ref('salas/'+sala+'/jugadores/'+miIdx+'/dinero').transaction(d => d + 500);
-        log(nombres[miIdx] + " pidió préstamo.");
+        log(nombres[miIdx] + " pidió préstamo de $500.");
     }
 
     function enviarChat() {
