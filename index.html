@@ -8,22 +8,17 @@
     <style>
         body { background: #fff0f3; font-family: 'Montserrat', sans-serif; display: flex; justify-content: center; padding: 20px; color: #c71585; }
         .container { display: flex; gap: 25px; width: 1000px; }
-        /* Ajuste a 5x5 */
         .board { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(5, 100px); gap: 8px; background: #ffccd5; padding: 15px; border-radius: 25px; position: relative; }
         .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; }
         .token { width: 35px; height: 35px; position: absolute; z-index: 10; transition: all 0.5s ease; pointer-events: none; }
         .center-zone { grid-column: 2 / 5; grid-row: 2 / 5; background: #fff5f7; border: 3px dashed #ff80bf; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; }
+        /* Botones en la parte inferior del tablero */
+        #banco-container { grid-column: 1 / 6; grid-row: 5 / 6; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #ffccd5; border-radius: 15px; padding: 5px; }
         .sidebar { width: 320px; display: flex; flex-direction: column; gap: 20px; }
         .panel { background: #fff0f9; padding: 20px; border-radius: 20px; border: 2px solid #ffccd5; }
-        .btn { width: 100%; padding: 10px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin: 5px 0; font-size: 12px; transition: transform 0.2s, background 0.2s; }
-        .btn:hover { background: #ff80bf; transform: scale(1.05); }
-        .input-field { width: 93%; padding: 8px; margin: 5px 0; border: 1px solid #ffccd5; border-radius: 8px; }
-        #log, #chat-log { height: 150px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; margin-bottom: 10px; }
-        #modal, #contrato-modal { display: none; position: fixed; top: 20%; left: 35%; width: 300px; background: #ffe4e9; padding: 20px; border: 3px solid #ff80bf; border-radius: 15px; text-align: center; z-index: 999; box-shadow: 5px 5px 15px rgba(0,0,0,0.1); }
-        #dado-valor { font-size: 24px; font-weight: bold; margin: 10px 0; }
-        #banco-container { grid-column: 1 / 6; grid-row: 5 / 6; display: flex; align-items: center; justify-content: center; background: #ffccd5; border-radius: 15px; gap: 10px; }
-        
-        /* Posicionamiento perimetral 5x5 */
+        .btn { width: 90%; padding: 8px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin: 2px 0; font-size: 11px; }
+        #modal { display: none; position: fixed; top: 20%; left: 35%; width: 300px; background: #ffe4e9; padding: 20px; border: 3px solid #ff80bf; border-radius: 15px; text-align: center; z-index: 999; }
+        #log, #chat-log { height: 120px; overflow-y: auto; font-size: 10px; background: white; border: 1px solid #ffccd5; padding: 5px; margin-bottom: 5px; }
         #cell-0 { grid-column: 1; grid-row: 1; } #cell-1 { grid-column: 2; grid-row: 1; } #cell-2 { grid-column: 3; grid-row: 1; } #cell-3 { grid-column: 4; grid-row: 1; } #cell-4 { grid-column: 5; grid-row: 1; }
         #cell-5 { grid-column: 5; grid-row: 2; } #cell-6 { grid-column: 5; grid-row: 3; } #cell-7 { grid-column: 5; grid-row: 4; } #cell-8 { grid-column: 5; grid-row: 5; }
         #cell-9 { grid-column: 4; grid-row: 5; } #cell-10 { grid-column: 3; grid-row: 5; } #cell-11 { grid-column: 2; grid-row: 5; } #cell-12 { grid-column: 1; grid-row: 5; }
@@ -34,30 +29,23 @@
 
 <div class="container">
     <div class="board" id="board">
-        <img src="https://i.imgur.com/FGnMi8Y.png" id="p0" class="token" style="display:none">
-        <img src="https://i.imgur.com/fRZJfP8.png" id="p1" class="token" style="display:none">
-        <img src="https://i.imgur.com/u2AtssG.png" id="p2" class="token" style="display:none">
-        <img src="https://i.imgur.com/ekQp8WL.png" id="p3" class="token" style="display:none">
         <div class="center-zone">
             <div id="turno-text" style="font-weight:bold;">ESPERANDO...</div>
-            <div id="dado-valor">0</div>
-            <img src="https://i.imgur.com/Nsafzb4.png" style="width:60px; cursor:pointer" onclick="tirarDado()">
+            <div id="dado-valor" style="font-size:20px">0</div>
+            <button class="btn" onclick="tirarDado()">Tirar Dado</button>
             <div id="acciones"></div>
             <div>💖 $<span id="dinero-mio">1000</span></div>
         </div>
         <div id="banco-container">
-            <button class="btn" style="width: 150px" onclick="abrirBanco()">🏦 Préstamo</button>
-            <button class="btn" style="width: 150px" onclick="verSaldos()">💰 Ver Saldos</button>
+            <div style="display:flex; gap:5px;">
+                <button class="btn" onclick="abrirBanco()">🏦 Banco</button>
+                <button class="btn" onclick="verSaldos()">💰 Saldos</button>
+            </div>
+            <p style="font-size:8px; margin:2px; color:#ff59aa">Nota: Deudas (50%) cobradas al pasar o caer en propiedades.</p>
         </div>
     </div>
     <div class="sidebar">
         <div class="panel">
-            <strong>Unirse a Sala</strong>
-            <input type="text" id="sala-id" class="input-field" placeholder="Nombre de la sala">
-            <button class="btn" onclick="unirse()">Entrar a Juego</button>
-        </div>
-        <div class="panel">
-            <strong>Historial</strong><div id="log"></div>
             <strong>Chat</strong><div id="chat-log"></div>
             <input type="text" id="chat-msg" class="input-field" placeholder="Mensaje...">
             <button class="btn" onclick="enviarChat()">Enviar</button>
@@ -65,44 +53,78 @@
     </div>
 </div>
 
-<div id="modal">
-    <h3 id="modal-title" style="margin:0"></h3>
-    <p id="modal-text" style="color:#c71585; font-weight:bold"></p>
-    <div id="modal-extra"></div>
-    <button class="btn" onclick="document.getElementById('modal').style.display='none'">Cerrar</button>
-</div>
+<div id="modal"><h3 id="modal-title"></h3><p id="modal-text"></p><div id="modal-extra"></div><button class="btn" onclick="document.getElementById('modal').style.display='none'">Cerrar</button></div>
 
 <script>
     const firebaseConfig = { databaseURL: "https://monopolovely-default-rtdb.firebaseio.com" };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
+    let miIdx = -1, sala = "default";
+    const nombres = ["Dog", "Horse", "Hat", "Car"];
+    const colores = ["#f590b0", "#dcd0ff", "#c1e1c1", "#f5eb98"];
+    const mapa = [{n:"SALIDA",p:0},{n:"IGLESIA",p:100},{n:"?",p:0},{n:"BOUTIQUE",p:200},{n:"CÁRCEL",p:0},{n:"SEOUL",p:500},{n:"GANGNAM",p:520},{n:"JEJU",p:250},{n:"BUSAN",p:300},{n:"INCHEON",p:350},{n:"JOYAS",p:400},{n:"PARKING",p:0},{n:"IMPUESTOS",p:150},{n:"?",p:0},{n:"ARCA",p:0},{n:"BUKCHON",p:500}];
 
+    function log(txt) { db.ref('salas/'+sala+'/log').push(txt); }
     function verSaldos() {
-        db.ref('salas/' + sala + '/jugadores').once('value', snap => {
-            let texto = "Saldos:<br>";
-            snap.forEach((child) => { texto += `${nombres[child.key]}: $${child.val().dinero}<br>`; });
+        db.ref('salas/'+sala+'/jugadores').once('value', snap => {
+            let s = "Saldos:<br>";
+            snap.forEach(c => s += nombres[c.key]+": $"+c.val().dinero+" (Deuda: $"+c.val().deuda+")<br>");
             document.getElementById('modal-title').innerText = "Finanzas";
-            document.getElementById('modal-text').innerHTML = texto;
+            document.getElementById('modal-text').innerHTML = s;
             document.getElementById('modal').style.display = 'block';
         });
     }
 
-    let miIdx = -1, sala = "";
-    const nombres = ["Dog", "Horse", "Hat", "Car"];
-    const colores = ["#f590b0", "#dcd0ff", "#c1e1c1", "#f5eb98"];
-    const mapa = [{n:"SALIDA",p:0},{n:"IGLESIA",p:100},{n:"?",p:0},{n:"BOUTIQUE",p:200},{n:"A LA CÁRCEL",p:0},{n:"CHEONGDAM",p:500},{n:"GANGNAM",p:520},{n:"SEOCHO-GU",p:250},{n:"MAPO",p:300},{n:"INCHEON",p:350},{n:"JOYAS",p:400},{n:"CÁRCEL",p:0},{n:"IMPUESTOS",p:0},{n:"?",p:0},{n:"ARCA",p:0},{n:"BUKCHON",p:500}];
-    const eventos = [{txt:"¡Ganaste la lotería!", m:200, g:true}, {txt:"¡Heredaste una fortuna!", m:400, g:true}, {txt:"Debes impuestos", m:150, g:false}, {txt:"Apuestas perdidas", m:250, g:false}];
+    function abrirBanco() {
+        document.getElementById('modal-title').innerText = "Banco";
+        let div = document.getElementById('modal-extra'); div.innerHTML = "";
+        [200, 500, 1000].forEach(m => {
+            let b = document.createElement('button'); b.className = 'btn'; b.innerText = "Préstamo $"+m;
+            b.onclick = () => { db.ref('salas/'+sala+'/jugadores/'+miIdx).transaction(j => { j.dinero+=m; j.deuda+=m; return j; }); document.getElementById('modal').style.display='none'; };
+            div.appendChild(b);
+        });
+        document.getElementById('modal').style.display = 'block';
+    }
 
-    function log(txt) { db.ref('salas/' + sala + '/log').push(txt); }
-    function unirse() { sala = document.getElementById('sala-id').value; db.ref('salas/' + sala + '/jugadores').once('value', snap => { miIdx = snap.numChildren(); if(miIdx > 3) return; db.ref('salas/' + sala + '/jugadores/' + miIdx).set({ pos: 0, dinero: 1000, enCarcel: false, deuda: 0, lanzamientos: 0 }); if(miIdx == 0) db.ref('salas/' + sala + '/turno').set(0); sincronizar(); }); }
-    function tirarDado() { if(miIdx === -1) return; db.ref('salas/' + sala).once('value', snap => { let s = snap.val(); if(s.turno !== miIdx) return; let j = s.jugadores[miIdx]; if(j.enCarcel) { db.ref('salas/' + sala + '/jugadores/' + miIdx + '/enCarcel').set(false); db.ref('salas/' + sala + '/turno').set((s.turno + 1) % s.jugadores.length); return; } let val = Math.floor(Math.random()*6)+1; document.getElementById('dado-valor').innerText = val; let nuevaPos = (j.pos + val) % mapa.length; db.ref('salas/' + sala + '/jugadores/' + miIdx + '/pos').set(nuevaPos); verificarCasilla(nuevaPos, j.dinero); db.ref('salas/' + sala + '/turno').set((s.turno + 1) % s.jugadores.length); }); }
-    function abrirBanco() { document.getElementById('modal-title').innerText = "Banco"; document.getElementById('modal-text').innerText = "Solicita préstamo:"; let div = document.getElementById('modal-extra'); div.innerHTML = ""; [200, 450, 600].forEach(m => { let b = document.createElement('button'); b.className = 'btn'; b.innerText = "$"+m; b.onclick = () => { db.ref('salas/' + sala + '/jugadores/' + miIdx).transaction(j => { if(j) { j.dinero += m; j.deuda += m; } return j; }); document.getElementById('modal').style.display = 'none'; }; div.appendChild(b); }); document.getElementById('modal').style.display = 'block'; }
-    function verificarCasilla(pos, dinero) { let div = document.getElementById('acciones'); div.innerHTML = ""; db.ref('salas/' + sala + '/propiedades/' + pos).once('value', s => { let prop = s.val(); if(!prop && mapa[pos].p > 0 && dinero >= mapa[pos].p) div.innerHTML = `<button class="btn" onclick="comprar(${pos})">Comprar $${mapa[pos].p}</button>`; }); }
-    function comprar(pos) { db.ref('salas/' + sala + '/propiedades/' + pos).set({ owner: miIdx, nivel: 1 }); db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d - mapa[pos].p); document.getElementById('acciones').innerHTML = ""; }
-    function enviarChat() { let msg = document.getElementById('chat-msg').value; db.ref('salas/' + sala + '/chat').push({ n: nombres[miIdx], m: msg }); document.getElementById('chat-msg').value = ""; }
-    function sincronizar() { db.ref('salas/' + sala).on('value', snap => { let s = snap.val(); if(!s) return; document.getElementById('dinero-mio').innerText = s.jugadores[miIdx].dinero; document.getElementById('turno-text').innerText = "Turno: " + nombres[s.turno]; s.jugadores.forEach((j, i) => { let el = document.getElementById('p' + i); el.style.display = 'block'; let cell = document.getElementById('cell-' + j.pos); if(cell) { el.style.left = (cell.offsetLeft + 15) + 'px'; el.style.top = (cell.offsetTop + 15) + 'px'; } }); }); }
-    
-    mapa.forEach((m, i) => { const d = document.createElement('div'); d.className = 'cell'; d.id = 'cell-' + i; d.innerHTML = `${m.n}<br>${m.p > 0 ? '$'+m.p : ''}`; document.getElementById('board').appendChild(d); });
+    function tirarDado() {
+        db.ref('salas/'+sala).once('value', snap => {
+            let s = snap.val();
+            if(s.turno !== miIdx) return;
+            let val = Math.floor(Math.random()*6)+1;
+            let j = s.jugadores[miIdx];
+            let pos = j.pos + val;
+            if(pos >= mapa.length) {
+                pos %= mapa.length;
+                let bon = 100;
+                let cobro = Math.min(j.deuda, Math.floor(bon*0.5));
+                db.ref('salas/'+sala+'/jugadores/'+miIdx).update({dinero: j.dinero + (bon-cobro), deuda: j.deuda - cobro});
+                log(nombres[miIdx]+" pasó por SALIDA. Cobró $100. Se cobró deuda: $"+cobro);
+            }
+            db.ref('salas/'+sala+'/jugadores/'+miIdx+'/pos').set(pos);
+            db.ref('salas/'+sala+'/turno').set((s.turno + 1) % s.jugadores.length);
+        });
+    }
+
+    function enviarChat() {
+        let msg = document.getElementById('chat-msg').value;
+        db.ref('salas/'+sala+'/chat').push({n: nombres[miIdx], m: msg, t: new Date().toLocaleTimeString()});
+    }
+
+    mapa.forEach((m, i) => {
+        const d = document.createElement('div'); d.className = 'cell'; d.id = 'cell-'+i;
+        d.innerHTML = `${m.n}<br>${m.p > 0 ? '$'+m.p : ''}`;
+        document.getElementById('board').appendChild(d);
+    });
+
+    db.ref('salas/'+sala).on('value', snap => {
+        let s = snap.val();
+        if(!s) return;
+        document.getElementById('dinero-mio').innerText = s.jugadores[miIdx]?.dinero || 0;
+        if(s.chat) {
+            let h = ""; Object.values(s.chat).forEach(c => h += `<div>[${c.t}] <b>${c.n}</b>: ${c.m}</div>`);
+            document.getElementById('chat-log').innerHTML = h;
+        }
+    });
 </script>
 </body>
 </html>
