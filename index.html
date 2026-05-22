@@ -88,7 +88,7 @@
         db.ref('salas/' + sala + '/jugadores').once('value', snap => {
             miIdx = snap.numChildren();
             if(miIdx > 3) return;
-            db.ref('salas/' + sala + '/jugadores/' + miIdx).set({ pos: 0, dinero: 1000, enCarcel: false, deuda: 0 });
+            db.ref('salas/' + sala + '/jugadores/' + miIdx).set({ pos: 0, dinero: 1000, enCarcel: false, deuda: 0, lanzamientos: 0 });
             if(miIdx == 0) db.ref('salas/' + sala + '/turno').set(0);
             sincronizar();
         });
@@ -107,8 +107,6 @@
             }
             let val = Math.floor(Math.random()*6)+1;
             document.getElementById('dado-valor').innerText = val;
-            
-            // Movimiento lineal exacto:
             let nuevaPos = j.pos + val;
             if(nuevaPos >= mapa.length) {
                 nuevaPos = nuevaPos % mapa.length;
@@ -116,12 +114,18 @@
                 let deuda = j.deuda || 0;
                 let pago = Math.min(ingreso * 0.5, deuda);
                 db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ dinero: (j.dinero || 0) + (ingreso - pago), deuda: deuda - pago });
-                log(nombres[miIdx] + " pasó por SALIDA: Banco retuvo $" + pago + " de deuda.");
+                if(pago > 0) log(nombres[miIdx] + " pasó por SALIDA: Banco retuvo $" + pago + " de deuda.");
             }
-            
             db.ref('salas/' + sala + '/jugadores/' + miIdx + '/pos').set(nuevaPos);
             verificarCasilla(nuevaPos, j.dinero);
-            db.ref('salas/' + sala + '/turno').set((s.turno + 1) % s.jugadores.length);
+            
+            let lanz = (j.lanzamientos || 0) + 1;
+            if(val === 6 && lanz < 3) {
+                db.ref('salas/' + sala + '/jugadores/' + miIdx + '/lanzamientos').set(lanz);
+            } else {
+                db.ref('salas/' + sala + '/jugadores/' + miIdx + '/lanzamientos').set(0);
+                db.ref('salas/' + sala + '/turno').set((s.turno + 1) % s.jugadores.length);
+            }
         });
     }
 
@@ -150,6 +154,9 @@
         
         if(pos === 4) { 
             db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ pos: 11, enCarcel: true }); 
+            document.getElementById('modal-title').innerText = "¡Arrestado!";
+            document.getElementById('modal-text').innerText = "¡Estas bajo arresto! Tienes derecho a un abogado.";
+            document.getElementById('modal').style.display = 'block';
             log(nombres[miIdx] + " ha sido arrestado.");
             return;
         }
@@ -171,9 +178,9 @@
                 if(dinero >= mapa[pos].p) div.innerHTML = `<button class="btn" onclick="comprar(${pos})">Comprar $${mapa[pos].p}</button>`;
             } else if(prop && prop.owner == miIdx) {
                 let costoMejora = mapa[pos].p + 50;
-                if(prop.nivel < 3) div.innerHTML = `<button class="btn" onclick="mejorar(${pos}, ${costoMejora})">Mejorar $${costoMejora}</button>`;
+                if(prop.nivel < 4) div.innerHTML = `<button class="btn" onclick="mejorar(${pos}, ${costoMejora})">Mejorar $${costoMejora}</button>`;
             } else if(prop && prop.owner != miIdx) {
-                let renta = Math.floor(mapa[pos].p * (prop.nivel == 3 ? 0.5 : 0.2));
+                let renta = Math.floor(mapa[pos].p * (prop.nivel == 4 ? 0.5 : 0.2));
                 db.ref('salas/' + sala + '/jugadores/' + miIdx).once('value', snap => {
                     let j = snap.val();
                     let pagoReal = Math.min(renta, j.dinero);
