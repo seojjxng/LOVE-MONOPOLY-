@@ -81,7 +81,16 @@
     let alquilerPendiente = null;
 
     function log(txt) { db.ref('salas/' + sala + '/log').push(txt); }
-    function unirse() { sala = document.getElementById('sala-id').value; db.ref('salas/' + sala + '/jugadores').once('value', snap => { miIdx = snap.numChildren(); db.ref('salas/' + sala + '/jugadores/' + miIdx).set({ pos: 0, dinero: 1000, deuda: 0, pausasDeuda: 0, enCarcel: 0 }); if(miIdx == 0) db.ref('salas/' + sala + '/turno').set(0); sincronizar(); }); }
+    function unirse() { 
+        sala = document.getElementById('sala-id').value; 
+        db.ref('salas/' + sala + '/jugadores').once('value', snap => { 
+            miIdx = snap.numChildren(); 
+            db.ref('salas/' + sala + '/jugadores/' + miIdx).set({ pos: 0, dinero: 1000, deuda: 0, pausasDeuda: 0, enCarcel: 0 }); 
+            if(miIdx == 0) db.ref('salas/' + sala + '/turno').set(0); 
+            db.ref('salas/' + sala + '/chat').push({ n: "Sistema", m: nombres[miIdx] + " ha entrado a la sala." });
+            sincronizar(); 
+        }); 
+    }
     
     function manejarCasilla(pos) {
         let p = mapa[pos];
@@ -101,9 +110,9 @@
         }
         if (p.n === "?" || p.n === "ARCA") { ejecutarEvento(); return; }
         if (p.n === "IMPUESTOS") {
-            let conceptos = ["Impuestos", "Arriendo", "Luz", "Agua", "Electricidad", "Teléfono"];
             let monto = Math.floor(Math.random() * (250 - 150 + 1)) + 150;
             db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => Number(d) - monto);
+            log(nombres[miIdx] + " pagó $" + monto + " de impuestos.");
             document.getElementById('modal-title').innerText = "Factura";
             document.getElementById('modal-text').innerText = "Pagaste $" + monto;
             document.getElementById('modal').style.display = 'block';
@@ -139,7 +148,7 @@
             {t:"Banco", m:"Pausa de deuda activada", f:()=>db.ref('salas/'+sala+'/jugadores/'+miIdx+'/pausasDeuda').set(2)}
         ];
         let e = evs[Math.floor(Math.random()*evs.length)];
-        e.f(); document.getElementById('modal-title').innerText = e.t; document.getElementById('modal-text').innerText = e.m; document.getElementById('modal').style.display = 'block';
+        e.f(); log(nombres[miIdx] + " ejecutó evento: " + e.t); document.getElementById('modal-title').innerText = e.t; document.getElementById('modal-text').innerText = e.m; document.getElementById('modal').style.display = 'block';
     }
 
     function cerrarConInteres() {
@@ -149,6 +158,7 @@
     }
 
     function procesarPago(deudorIdx, acreedorIdx, monto) {
+        log(nombres[deudorIdx] + " pagó $" + monto + " a " + nombres[acreedorIdx]);
         db.ref('salas/' + sala + '/jugadores').transaction(j => {
             if(!j) return;
             j[deudorIdx].dinero = Number(j[deudorIdx].dinero) - monto;
@@ -163,8 +173,8 @@
         });
     }
 
-    function comprar(pos) { db.ref('salas/' + sala + '/propiedades/' + pos).set({owner: miIdx, nivel: 0}); db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => Number(d) - Number(mapa[pos].p)); document.getElementById('modal').style.display = 'none'; verificarNegativos(); }
-    function mejorar(pos) { let costo = Number(mapa[pos].p) + 50; db.ref('salas/' + sala + '/propiedades/' + pos + '/nivel').transaction(n => (Number(n) || 0) + 1); db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => Number(d) - costo); document.getElementById('modal').style.display = 'none'; verificarNegativos(); }
+    function comprar(pos) { log(nombres[miIdx] + " compró " + mapa[pos].n); db.ref('salas/' + sala + '/propiedades/' + pos).set({owner: miIdx, nivel: 0}); db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => Number(d) - Number(mapa[pos].p)); document.getElementById('modal').style.display = 'none'; verificarNegativos(); }
+    function mejorar(pos) { let costo = Number(mapa[pos].p) + 50; log(nombres[miIdx] + " mejoró " + mapa[pos].n); db.ref('salas/' + sala + '/propiedades/' + pos + '/nivel').transaction(n => (Number(n) || 0) + 1); db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => Number(d) - costo); document.getElementById('modal').style.display = 'none'; verificarNegativos(); }
     
     function tirarDado() { 
         if(miIdx === -1) return;
@@ -178,13 +188,14 @@
             let val = Math.floor(Math.random()*6)+1;
             document.getElementById('dado-valor').innerText = val;
             let nuevaPos = (Number(s.jugadores[miIdx].pos) + val) % mapa.length;
+            log(nombres[miIdx] + " sacó " + val + " y cayó en " + mapa[nuevaPos].n);
             db.ref('salas/' + sala + '/jugadores/' + miIdx + '/pos').set(nuevaPos);
             db.ref('salas/' + sala + '/turno').set((Number(s.turno) + 1) % s.jugadores.length);
             setTimeout(() => manejarCasilla(nuevaPos), 600);
         }); 
     }
 
-    function abrirBanco() { document.getElementById('modal-title').innerText = "Banco - Préstamo necesario"; document.getElementById('modal-text').innerText = "Tu saldo es negativo, elige un préstamo:"; let div = document.getElementById('modal-extra'); div.innerHTML = ""; [200, 300, 400, 600, 800].forEach(m => { let b = document.createElement('button'); b.className = 'btn'; b.innerText = "$"+m; b.onclick = () => { db.ref('salas/' + sala + '/jugadores/' + miIdx).transaction(j => { if(j) { j.dinero = Number(j.dinero) + m; j.deuda = Number(j.deuda || 0) + m; } return j; }); document.getElementById('modal').style.display = 'none'; }; div.appendChild(b); }); document.getElementById('modal').style.display = 'block'; }
+    function abrirBanco() { document.getElementById('modal-title').innerText = "Banco - Préstamo necesario"; document.getElementById('modal-text').innerText = "Tu saldo es negativo, elige un préstamo:"; let div = document.getElementById('modal-extra'); div.innerHTML = ""; [200, 300, 400, 600, 800].forEach(m => { let b = document.createElement('button'); b.className = 'btn'; b.innerText = "$"+m; b.onclick = () => { log(nombres[miIdx] + " pidió un préstamo de $" + m); db.ref('salas/' + sala + '/jugadores/' + miIdx).transaction(j => { if(j) { j.dinero = Number(j.dinero) + m; j.deuda = Number(j.deuda || 0) + m; } return j; }); document.getElementById('modal').style.display = 'none'; }; div.appendChild(b); }); document.getElementById('modal').style.display = 'block'; }
     function verSaldos() { db.ref('salas/' + sala + '/jugadores').once('value', snap => { let txt = ""; snap.forEach(c => txt += nombres[c.key] + ": $" + c.val().dinero + "<br>"); document.getElementById('modal-title').innerText = "Saldos"; document.getElementById('modal-text').innerHTML = txt; document.getElementById('modal').style.display = 'block'; }); }
     function enviarChat() { let msg = document.getElementById('chat-msg').value; db.ref('salas/' + sala + '/chat').push({ n: nombres[miIdx], m: msg }); document.getElementById('chat-msg').value = ""; }
     
