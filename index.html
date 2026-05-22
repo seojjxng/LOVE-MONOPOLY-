@@ -85,6 +85,7 @@
     const mapa = [{n:"SALIDA",p:0},{n:"IGLESIA",p:100},{n:"?",p:0},{n:"BOUTIQUE",p:200},{n:"A LA CÁRCEL",p:0},{n:"CHEONGDAM",p:500},{n:"GANGNAM",p:520},{n:"SEOCHO-GU",p:250},{n:"MAPO",p:300},{n:"INCHEON",p:350},{n:"JOYAS",p:400},{n:"CÁRCEL",p:0},{n:"IMPUESTOS",p:0},{n:"?",p:0},{n:"ARCA",p:0},{n:"BUKCHON",p:500}];
 
     let alquilerPendiente = null;
+    let turnosSeis = 0;
 
     function log(txt) { db.ref('salas/' + sala + '/log').push(txt); }
     function unirse() { 
@@ -125,6 +126,7 @@
             document.getElementById('modal-title').innerText = "Cárcel";
             document.getElementById('modal-text').innerText = "Estás bajo arresto. Pierdes tu próximo turno.";
             document.getElementById('modal').style.display = 'block';
+            turnosSeis = 0;
             pasarTurno();
             return;
         }
@@ -173,6 +175,7 @@
     }
 
     function pasarTurno() {
+        turnosSeis = 0;
         db.ref('salas/'+sala+'/jugadores').once('value', snap => {
             let total = snap.numChildren();
             db.ref('salas/'+sala+'/turno').once('value', tSnap => {
@@ -250,24 +253,33 @@
     function comprar(pos) { log(nombres[miIdx] + " compró " + mapa[pos].n); db.ref('salas/' + sala + '/propiedades/' + pos).set({owner: miIdx, nivel: 0}); db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => Number(d) - Number(mapa[pos].p)); document.getElementById('modal').style.display = 'none'; }
     function mejorar(pos) { log(nombres[miIdx] + " mejoró " + mapa[pos].n); db.ref('salas/' + sala + '/propiedades/' + pos + '/nivel').transaction(n => (Number(n) || 0) + 1); db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => Number(d) - 50); document.getElementById('modal').style.display = 'none'; }
     
-    let doblesConsecutivos = 0;
     function tirarDado() { 
         if(miIdx === -1) return;
         db.ref('salas/' + sala).once('value', snap => {
             let s = snap.val(); if(s.turno !== miIdx) return;
-            let d1 = Math.floor(Math.random()*6)+1, d2 = Math.floor(Math.random()*6)+1;
-            document.getElementById('dado-valor').innerText = (d1+d2);
-            if(d1 === d2) { doblesConsecutivos++; } else { doblesConsecutivos = 0; }
-            if(doblesConsecutivos >= 2) { doblesConsecutivos = 0; log(nombres[miIdx] + " lanzó dobles tres veces, ¡a la cárcel!"); db.ref('salas/'+sala+'/jugadores/'+miIdx).update({pos: 11, enCarcel: 1}); pasarTurno(); return; }
+            let dado = Math.floor(Math.random()*6)+1;
+            document.getElementById('dado-valor').innerText = dado;
             
             let posActual = Number(s.jugadores[miIdx].pos);
-            let nuevaPos = (posActual + d1 + d2) % mapa.length;
+            let nuevaPos = (posActual + dado) % mapa.length;
             if (nuevaPos < posActual) {
                 db.ref('salas/'+sala+'/jugadores/'+miIdx+'/dinero').transaction(d => d + 200);
                 log(nombres[miIdx] + " pasó por SALIDA y recibió $200.");
             }
             db.ref('salas/' + sala + '/jugadores/' + miIdx + '/pos').set(nuevaPos);
-            if(d1 !== d2) pasarTurno();
+
+            if(dado === 6) {
+                turnosSeis++;
+                if(turnosSeis >= 3) {
+                    log(nombres[miIdx] + " sacó un 6 tres veces, ¡pasa el turno!");
+                    turnosSeis = 0;
+                    pasarTurno();
+                } else {
+                    log(nombres[miIdx] + " sacó un 6, ¡gana un turno extra!");
+                }
+            } else {
+                pasarTurno();
+            }
             setTimeout(() => manejarCasilla(nuevaPos), 600);
         }); 
     }
