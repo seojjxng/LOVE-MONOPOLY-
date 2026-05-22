@@ -94,7 +94,7 @@
         document.getElementById('btn-unirse').disabled = true;
         db.ref('salas/' + sala + '/jugadores').once('value', snap => { 
             miIdx = snap.numChildren(); 
-            db.ref('salas/' + sala + '/jugadores/' + miIdx).set({ pos: 0, dinero: 1000, deuda: 0, pausasDeuda: 0, enCarcel: 0, tienePrestamo: false }); 
+            db.ref('salas/' + sala + '/jugadores/' + miIdx).set({ pos: 0, dinero: 1000, enCarcel: 0, tienePrestamo: false }); 
             if(miIdx == 0) db.ref('salas/' + sala + '/turno').set(0); 
             db.ref('salas/' + sala + '/chat').push({ n: "Sistema", m: nombres[miIdx] + " ha entrado a la sala." });
             sincronizar(); 
@@ -103,7 +103,7 @@
     
     function verificarBancarrota(jugadorIdx, saldo) {
         if (saldo < 0) {
-            log("¡" + nombres[jugadorIdx] + " ha quedado en bancarrota!");
+            log("¡" + nombres[jugadorIdx] + " ha caído en números rojos!");
             document.getElementById('modal-title').innerText = "¡Bancarrota!";
             document.getElementById('modal-text').innerText = "Tu saldo es negativo. ¡Necesitas un préstamo urgente!";
             document.getElementById('modal-extra').innerHTML = `<button class="btn" onclick="abrirBanco()">Pedir Préstamo</button>`;
@@ -115,11 +115,10 @@
         let p = mapa[pos];
         let extra = document.getElementById('modal-extra'); extra.innerHTML = "";
         if (p.n === "A LA CÁRCEL" || p.n === "CÁRCEL") {
-            db.ref('salas/'+sala+'/jugadores/'+miIdx).update({pos: 11, enCarcel: 1, turnosCarcel: 1});
-            log(nombres[miIdx] + " terminó en la cárcel.");
+            db.ref('salas/'+sala+'/jugadores/'+miIdx).update({pos: 11, enCarcel: 1});
+            log(nombres[miIdx] + " fue enviado a la cárcel.");
             document.getElementById('modal-title').innerText = "Cárcel";
-            document.getElementById('modal-text').innerText = "Estás bajo arresto. ¿Pagar $100 de fianza?";
-            extra.innerHTML = `<button class="btn" onclick="pagarFianza()">Pagar Fianza</button><button class="btn" onclick="liberarCarcel()">No pagar</button>`;
+            document.getElementById('modal-text').innerText = "Estás bajo arresto. Pierdes tu próximo turno.";
             document.getElementById('modal').style.display = 'block';
             return;
         }
@@ -130,7 +129,8 @@
                 {m: "Tasa de servicio público: Pagas $150.", v: 150},
                 {m: "Contribución a la ciudad: Pagas $180.", v: 180},
                 {m: "Multa por exceso de velocidad: Pagas $120.", v: 120},
-                {m: "Recargo por lujo: Pagas $250.", v: 250}
+                {m: "Recargo por lujo: Pagas $250.", v: 250},
+                {m: "Cuota de mantenimiento urbano: Pagas $100.", v: 100}
             ];
             let sit = situaciones[Math.floor(Math.random()*situaciones.length)];
             db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => {
@@ -164,18 +164,6 @@
             }
             document.getElementById('modal').style.display = 'block';
         });
-    }
-
-    function pagarFianza() {
-        db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ enCarcel: 0, turnosCarcel: 0 });
-        db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => Number(d) - 100);
-        log(nombres[miIdx] + " pagó $100 de fianza.");
-        document.getElementById('modal').style.display = 'none';
-    }
-
-    function liberarCarcel() {
-        document.getElementById('modal').style.display = 'none';
-        pasarTurno();
     }
 
     function pasarTurno() {
@@ -253,7 +241,7 @@
             let s = snap.val(); if(s.turno !== miIdx) return;
             if(s.jugadores[miIdx].enCarcel === 1) { 
                 db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ enCarcel: 0 });
-                log(nombres[miIdx] + " cumplió su condena y sale de la cárcel.");
+                log(nombres[miIdx] + " sale de la cárcel.");
                 pasarTurno();
                 return;
             }
