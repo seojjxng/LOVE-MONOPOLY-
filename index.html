@@ -197,13 +197,23 @@
         });
     }
 
-    function verPropiedad(pos, esCaida = false) {
+   function verPropiedad(pos, esCaida = false) {
         let p = mapa[pos];
         if (p.p === 0) return;
         let extra = document.getElementById('modal-extra'); extra.innerHTML = "";
+        
         db.ref('salas/' + sala + '/propiedades/' + pos).once('value', snap => {
             let prop = snap.val();
             document.getElementById('modal-title').innerText = "Tarjeta de Propiedad";
+            
+            // Definimos los niveles y sus porcentajes
+            let porcentajes = [0.10, 0.15, 0.20, 0.30, 0.40, 0.50];
+            let nivelesNombres = ["Base", "1 Casa", "2 Casas", "3 Casas", "4 Casas", "Hotel"];
+            let listaAlquileres = "";
+            porcentajes.forEach((porc, i) => {
+                listaAlquileres += `<li>${nivelesNombres[i]}: $${Math.floor(p.p * porc)}</li>`;
+            });
+
             let niveles = ["Ninguna", "1 Casa", "2 Casas", "3 Casas", "4 Casas", "Hotel"];
             let htmlCard = `<div class="card-property">
                 <div class="card-header">${p.n}</div>
@@ -223,31 +233,28 @@
                 }
             } else {
                 if(prop.hipotecada) {
-        htmlCard += `<p>Dueño: <b>${nombres[prop.owner]}</b> (Hipotecada)</p>`;
-    } else {
-        let alquilerActual = Math.floor(p.p * porcentajes[prop.nivel || 0]);
-        htmlCard += `<p>Dueño: <b>${nombres[prop.owner]}</b></p>
-                     <p>Alquiler actual: <b>$${alquilerActual}</b></p>
-                     <p style="font-size: 10px; margin-top: 5px;"><b>Tabla de precios:</b></p>
-                     <ul style="font-size: 10px; padding-left: 15px; margin: 0;">${listaAlquileres}</ul>`;
+                    htmlCard += `<p>Dueño: <b>${nombres[prop.owner]}</b> (Hipotecada)</p>`;
                 } else {
-    // Definimos los niveles y sus porcentajes
-    let porcentajes = [0.10, 0.15, 0.20, 0.30, 0.40, 0.50];
-    let nivelesNombres = ["Base", "1 Casa", "2 Casas", "3 Casas", "4 Casas", "Hotel"];
-                    let listaAlquileres = "";
-    porcentajes.forEach((porc, i) => {
-        listaAlquileres += `<li>${nivelesNombres[i]}: $${Math.floor(p.p * porc)}</li>`;
-    });
-                    htmlCard += `<p>Dueño: <b>${nombres[prop.owner]}</b></p><p>Alquiler: <b>$${alquiler}</b></p>`;
+                    let alquilerActual = Math.floor(p.p * porcentajes[prop.nivel || 0]);
+                    htmlCard += `<p>Dueño: <b>${nombres[prop.owner]}</b></p>
+                                 <p>Alquiler actual: <b>$${alquilerActual}</b></p>
+                                 <p style="font-size: 10px; margin-top: 5px;"><b>Tabla de precios:</b></p>
+                                 <ul style="font-size: 10px; padding-left: 15px; margin: 0;">${listaAlquileres}</ul>`;
+                    
                     if(esCaida && prop.owner !== miIdx) {
-            alquilerPendiente = {a: prop.owner, m: alquilerActual};
-            extra.innerHTML = `
-                <button class="btn" onclick="procesarPago(${miIdx}, ${prop.owner}, ${alquilerActual})">Pagar Alquiler</button>
-                <button class="btn" style="background:#ff80bf" onclick="intentarEvasion(${miIdx}, ${prop.owner}, ${alquilerActual})">Intentar Evasión</button>
-            `;
-        }
+                        alquilerPendiente = {a: prop.owner, m: alquilerActual};
+                        extra.innerHTML = `
+                            <button class="btn" onclick="procesarPago(${miIdx}, ${prop.owner}, ${alquilerActual})">Pagar Alquiler</button>
+                            <button class="btn" style="background:#ff80bf" onclick="intentarEvasion(${miIdx}, ${prop.owner}, ${alquilerActual})">Intentar Evasión</button>
+                        `;
+                    }
+                }
+            }
+            htmlCard += `</div>`;
+            document.getElementById('modal-text').innerHTML = htmlCard;
+            document.getElementById('modal').style.display = 'block';
+        });
     }
-}
             htmlCard += `</div>`;
             document.getElementById('modal-text').innerHTML = htmlCard;
             document.getElementById('modal').style.display = 'block';
