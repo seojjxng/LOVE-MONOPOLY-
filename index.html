@@ -1,6 +1,4 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
+<!DOCTYPE html><html lang="es"><head>
     <meta charset="UTF-8">
     <title>Monopoly Naeun Town</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -10,9 +8,9 @@
         .container { display: flex; gap: 25px; width: 1000px; }
         .game-column { display: flex; flex-direction: column; gap: 15px; }
         .board { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(5, 100px); gap: 8px; background: #ffccd5; padding: 15px; border-radius: 25px; position: relative; }
-        .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; position: relative; cursor: pointer; padding: 0; }
+        .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; position: relative; cursor: pointer; }
         .strip { width: 100%; height: 15px; background: #ff80bf; position: absolute; top: 0; border-top-left-radius: 8px; border-top-right-radius: 8px; }
-        .house-container { position: absolute; bottom: 5px; display: flex; gap: 2px; pointer-events: none; }
+        .house-container { position: absolute; bottom: 5px; display: flex; gap: 2px; }
         .house { width: 10px; height: 10px; background: #ff59aa; }
         .hotel { width: 30px; height: 10px; background: #c71585; }
         .token { width: 35px; height: 35px; position: absolute; z-index: 10; transition: all 0.5s ease; pointer-events: none; }
@@ -24,20 +22,16 @@
         #log { height: 125px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; margin-bottom: 10px; }
         #chat-log { height: 125px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; margin-bottom: 10px; }
         #modal { display: none; position: fixed; top: 20%; left: 35%; width: 300px; background: #ffe4e9; padding: 20px; border: 3px solid #ff80bf; border-radius: 15px; text-align: center; z-index: 999; }
+        /* Estilo tarjeta propiedad */
+        .card-property { border: 2px solid #c71585; padding: 10px; border-radius: 5px; background: white; margin-bottom: 10px; }
+        .card-header { background: #ff80bf; color: white; padding: 5px; font-weight: bold; margin-bottom: 10px; }
         #banco-container { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; background: #fff0f9; border: 2px solid #ffccd5; border-radius: 20px; padding: 15px; gap: 10px; }
         #cell-0 { grid-column: 1; grid-row: 1; } #cell-1 { grid-column: 2; grid-row: 1; } #cell-2 { grid-column: 3; grid-row: 1; } #cell-3 { grid-column: 4; grid-row: 1; } #cell-4 { grid-column: 5; grid-row: 1; }
         #cell-5 { grid-column: 5; grid-row: 2; } #cell-6 { grid-column: 5; grid-row: 3; } #cell-7 { grid-column: 5; grid-row: 4; } #cell-8 { grid-column: 5; grid-row: 5; }
         #cell-9 { grid-column: 4; grid-row: 5; } #cell-10 { grid-column: 3; grid-row: 5; } #cell-11 { grid-column: 2; grid-row: 5; } #cell-12 { grid-column: 1; grid-row: 5; }
         #cell-13 { grid-column: 1; grid-row: 4; } #cell-14 { grid-column: 1; grid-row: 3; } #cell-15 { grid-column: 1; grid-row: 2; }
-    </style>
-</head>
-<body>
-
-<audio loop autoplay>
-    <source src="https://dl.dropbox.com/scl/fi/5oxzgnxoe30zqd4m6hdfh/kawaii-playlist-for-snack-time-BGM-POP.mp3?rlkey=1lw76u3u1w1ck3dj2ej5x7ml7&st=y6j07iwx&dl=1" type="audio/mpeg">
-</audio>
-
-<div class="container">
+    </style></head><body><audio loop autoplay>
+    <source src="https://dl.dropbox.com/scl/fi/5oxzgnxoe30zqd4m6hdfh/kawaii-playlist-for-snack-time-BGM-POP.mp3?rlkey=1lw76u3u1w1ck3dj2ej5x7ml7&st=y6j07iwx&dl=1" type="audio/mpeg"></audio><div class="container">
     <div class="game-column">
         <div class="board" id="board">
             <img src="https://i.imgur.com/FGnMi8Y.png" id="p0" class="token" style="display:none">
@@ -70,17 +64,11 @@
             <input type="text" id="chat-msg" class="input-field" placeholder="Mensaje...">
             <button class="btn" onclick="enviarChat()">Enviar</button>
         </div>
-    </div>
-</div>
-
-<div id="modal">
+    </div></div><div id="modal">
     <h3 id="modal-title"></h3>
-    <p id="modal-text"></p>
+    <div id="modal-text"></div>
     <div id="modal-extra"></div>
-    <button class="btn" id="btn-cerrar" onclick="cerrarConInteres()">Cerrar</button>
-</div>
-
-<script>
+    <button class="btn" id="btn-cerrar" onclick="document.getElementById('modal').style.display='none'; alquilerPendiente=null;">Cerrar</button></div><script>
     const firebaseConfig = { databaseURL: "https://monopolovely-default-rtdb.firebaseio.com" };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
@@ -186,15 +174,48 @@
         });
     }
 
+    function verPropiedad(pos, esCaida = false) {
+        let p = mapa[pos];
+        if (p.p === 0) return;
+        let extra = document.getElementById('modal-extra'); extra.innerHTML = "";
+        db.ref('salas/' + sala + '/propiedades/' + pos).once('value', snap => {
+            let prop = snap.val();
+            document.getElementById('modal-title').innerText = "Tarjeta de Propiedad";
+            
+            let niveles = ["Ninguna", "1 Casa", "2 Casas", "3 Casas", "4 Casas", "Hotel"];
+            let htmlCard = `<div class="card-property">
+                <div class="card-header">${p.n}</div>
+                <p>Valor de compra: <b>$${p.p}</b></p>`;
+            
+            if (!prop) {
+                htmlCard += `<p>Estado: <b>Disponible</b></p>`;
+                if(esCaida) extra.innerHTML = `<button class="btn" onclick="comprar(${pos})">Comprar</button>`;
+            } else if (prop.owner === miIdx) {
+                htmlCard += `<p>Dueño: <b>Tú</b></p><p>Nivel actual: <b>${niveles[prop.nivel || 0]}</b></p>`;
+                if (prop.nivel < 5) extra.innerHTML = `<button class="btn" onclick="mejorar(${pos})">Mejorar (Coste: $50)</button>`;
+            } else {
+                let porcentajes = [0.10, 0.15, 0.20, 0.30, 0.40, 0.50];
+                let alquiler = Math.floor(p.p * porcentajes[prop.nivel || 0]);
+                htmlCard += `<p>Dueño: <b>${nombres[prop.owner]}</b></p><p>Alquiler actual: <b>$${alquiler}</b></p>`;
+                if(esCaida) {
+                    alquilerPendiente = { monto: alquiler, dueño: prop.owner };
+                    extra.innerHTML = `<button class="btn" onclick="procesarPago(${miIdx}, ${prop.owner}, ${alquiler})">Pagar Alquiler</button>`;
+                }
+            }
+            htmlCard += `</div>`;
+            document.getElementById('modal-text').innerHTML = htmlCard;
+            document.getElementById('modal').style.display = 'block';
+        });
+    }
+
     function manejarCasilla(pos) {
         let p = mapa[pos];
-        let extra = document.getElementById('modal-extra'); extra.innerHTML = "";
         if (p.n === "A LA CÁRCEL" || p.n === "CÁRCEL") {
             db.ref('salas/'+sala+'/jugadores/'+miIdx).update({pos: 11, enCarcel: 1});
             log(nombres[miIdx] + " fue enviado a la cárcel.");
             document.getElementById('modal-title').innerText = "Cárcel";
             document.getElementById('modal-text').innerText = "¡Tiene derecho a guardar silencio y a un abogado!";
-            extra.innerHTML = `<button class="btn" onclick="pagarFianza()">Pagar Fianza ($100)</button><button class="btn" onclick="quedarseEnCarcel()">Quedarse un turno</button>`;
+            document.getElementById('modal-extra').innerHTML = `<button class="btn" onclick="pagarFianza()">Pagar Fianza ($100)</button><button class="btn" onclick="quedarseEnCarcel()">Quedarse un turno</button>`;
             document.getElementById('modal').style.display = 'block';
             turnosSeis = 0;
             pasarTurno();
@@ -219,29 +240,11 @@
             log(nombres[miIdx] + " " + sit.m);
             document.getElementById('modal-title').innerText = "Impuestos";
             document.getElementById('modal-text').innerText = sit.m;
+            document.getElementById('modal-extra').innerHTML = "";
             document.getElementById('modal').style.display = 'block';
             return;
         }
-        if (p.p === 0) return;
-        db.ref('salas/' + sala + '/propiedades/' + pos).once('value', snap => {
-            let prop = snap.val();
-            document.getElementById('modal-title').innerText = p.n;
-            if (!prop) {
-                document.getElementById('modal-text').innerText = "Precio: $" + p.p;
-                extra.innerHTML = `<button class="btn" onclick="comprar(${pos})">Comprar</button>`;
-            } else if (prop.owner === miIdx) {
-                const niveles = ["Ninguna", "1 Casa", "2 Casas", "3 Casas", "4 Casas", "Hotel"];
-                document.getElementById('modal-text').innerText = "Nivel: " + niveles[prop.nivel || 0];
-                if (prop.nivel < 5) extra.innerHTML = `<button class="btn" onclick="mejorar(${pos})">Mejorar (Precio + $50)</button>`;
-            } else {
-                let porcentajes = [0.10, 0.15, 0.20, 0.30, 0.40, 0.50];
-                let alquiler = Math.floor(p.p * porcentajes[prop.nivel || 0]);
-                alquilerPendiente = { monto: alquiler, dueño: prop.owner };
-                document.getElementById('modal-text').innerText = "Alquiler: $" + alquiler;
-                extra.innerHTML = `<button class="btn" onclick="procesarPago(${miIdx}, ${prop.owner}, ${alquiler})">Pagar</button>`;
-            }
-            document.getElementById('modal').style.display = 'block';
-        });
+        verPropiedad(pos, true);
     }
 
     function pagarFianza() {
@@ -262,7 +265,6 @@
             db.ref('salas/'+sala+'/turno').once('value', tSnap => {
                 let t = Number(tSnap.val());
                 let nuevoTurno = (t + 1) % total;
-                
                 db.ref('salas/'+sala+'/jugadores/'+nuevoTurno).once('value', jSnap => {
                     if(jSnap.val().enCarcel === 1) {
                          db.ref('salas/'+sala+'/jugadores/'+nuevoTurno).update({enCarcel: 0});
@@ -301,21 +303,8 @@
         log(nombres[miIdx] + " " + e.t + ": " + e.m); 
         document.getElementById('modal-title').innerText = e.t; 
         document.getElementById('modal-text').innerText = e.m; 
+        document.getElementById('modal-extra').innerHTML = "";
         document.getElementById('modal').style.display = 'block';
-    }
-
-    function cerrarConInteres() {
-        if(alquilerPendiente) {
-            let multa = alquilerPendiente.monto + 50;
-            db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => {
-                let nuevo = Number(d) - multa;
-                setTimeout(() => verificarBancarrota(miIdx, nuevo), 500);
-                return nuevo;
-            });
-            log(nombres[miIdx] + " evadió su deuda y pagó $" + multa + " como penalización.");
-            alquilerPendiente = null;
-        }
-        document.getElementById('modal').style.display = 'none';
     }
 
     function procesarPago(d, a, m) {
@@ -467,13 +456,10 @@
     }
 
     mapa.forEach((m, i) => { 
-        const d = document.createElement('button'); 
+        const d = document.createElement('div'); 
         d.className = 'cell'; 
         d.id = 'cell-' + i; 
+        d.onclick = () => verPropiedad(i);
         d.innerHTML = `<div class="strip"></div>${m.n}<br>${m.p > 0 ? '$'+m.p : ''}<div class="house-container"></div>`; 
-        d.onclick = () => manejarCasilla(i);
         document.getElementById('board').appendChild(d); 
-    });
-</script>
-</body>
-</html>
+    });</script></body></html>
