@@ -80,6 +80,14 @@
     const colores = ["#f590b0", "#dcd0ff", "#c1e1c1", "#f5eb98"];
     const mapa = [{n:"SALIDA",p:0},{n:"IGLESIA",p:100},{n:"?",p:0},{n:"BOUTIQUE",p:200},{n:"A LA CÁRCEL",p:0},{n:"CHEONGDAM",p:500},{n:"GANGNAM",p:520},{n:"SEOCHO-GU",p:250},{n:"MAPO",p:300},{n:"INCHEON",p:350},{n:"JOYAS",p:400},{n:"CÁRCEL",p:0},{n:"IMPUESTOS",p:0},{n:"?",p:0},{n:"ARCA",p:0},{n:"BUKCHON",p:500}];
     const eventos = [{txt:"¡Ganaste la lotería!", m:200, g:true}, {txt:"¡Heredaste una fortuna de la tía de una tía!", m:400, g:true}, {txt:"Debes impuestos sobre la renta", m:150, g:false}, {txt:"Apuestas, ¡debes por apuestas!", m:250, g:false}];
+    
+    // Tabla de coordenadas fijas para el tablero de 5x6
+    const coords = [
+        {x: 460, y: 550}, {x: 352, y: 550}, {x: 244, y: 550}, {x: 136, y: 550}, {x: 28, y: 550},
+        {x: 28, y: 442}, {x: 28, y: 334}, {x: 28, y: 226}, {x: 28, y: 118},
+        {x: 28, y: 10}, {x: 136, y: 10}, {x: 244, y: 10}, {x: 352, y: 10}, {x: 460, y: 10},
+        {x: 460, y: 118}, {x: 460, y: 226}
+    ];
 
     function log(txt) { db.ref('salas/' + sala + '/log').push(txt); }
 
@@ -203,7 +211,28 @@
     function comprar(pos) { db.ref('salas/' + sala + '/propiedades/' + pos).set({ owner: miIdx, nivel: 1 }); db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d - mapa[pos].p); log(nombres[miIdx] + " compró " + mapa[pos].n); document.getElementById('acciones').innerHTML = ""; }
     function mejorar(pos, costo) { db.ref('salas/' + sala + '/propiedades/' + pos + '/nivel').transaction(n => (n || 1) + 1); db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d - costo); log(nombres[miIdx] + " mejoró propiedad."); document.getElementById('acciones').innerHTML = ""; }
     function enviarChat() { let msg = document.getElementById('chat-msg').value; db.ref('salas/' + sala + '/chat').push({ n: nombres[miIdx], m: msg, t: new Date().toLocaleTimeString() }); document.getElementById('chat-msg').value = ""; }
-    function sincronizar() { db.ref('salas/' + sala).on('value', snap => { let s = snap.val(); if(!s) return; document.getElementById('dinero-mio').innerText = s.jugadores[miIdx].dinero; document.getElementById('turno-text').innerText = "Turno: " + nombres[s.turno]; s.jugadores.forEach((j, i) => { let el = document.getElementById('p' + i); el.style.display = 'block'; let cell = document.getElementById('cell-' + j.pos); if(cell) { el.style.left = (cell.offsetLeft + 15 + (i*8)) + 'px'; el.style.top = (cell.offsetTop + 15) + 'px'; } }); if(s.propiedades) Object.keys(s.propiedades).forEach(p => { let cell = document.getElementById('cell-'+p); if(cell) cell.style.backgroundColor = colores[s.propiedades[p].owner]; }); if(s.log) { let html = ""; Object.values(s.log).forEach(l => html += `<div>${l}</div>`); document.getElementById('log').innerHTML = html; } if(s.chat) { let html = ""; Object.values(s.chat).forEach(c => html += `<div><b>${c.n}</b>: ${c.m}</div>`); document.getElementById('chat-log').innerHTML = html; } }); }
+    
+    function sincronizar() { 
+        db.ref('salas/' + sala).on('value', snap => { 
+            let s = snap.val(); 
+            if(!s) return; 
+            document.getElementById('dinero-mio').innerText = s.jugadores[miIdx].dinero; 
+            document.getElementById('turno-text').innerText = "Turno: " + nombres[s.turno]; 
+            s.jugadores.forEach((j, i) => { 
+                let el = document.getElementById('p' + i); 
+                el.style.display = 'block'; 
+                let pos = coords[j.pos];
+                if(pos) { 
+                    el.style.left = (pos.x + (i * 8)) + 'px'; 
+                    el.style.top = (pos.y + 15) + 'px'; 
+                } 
+            }); 
+            if(s.propiedades) Object.keys(s.propiedades).forEach(p => { let cell = document.getElementById('cell-'+p); if(cell) cell.style.backgroundColor = colores[s.propiedades[p].owner]; }); 
+            if(s.log) { let html = ""; Object.values(s.log).forEach(l => html += `<div>${l}</div>`); document.getElementById('log').innerHTML = html; } 
+            if(s.chat) { let html = ""; Object.values(s.chat).forEach(c => html += `<div><b>${c.n}</b>: ${c.m}</div>`); document.getElementById('chat-log').innerHTML = html; } 
+        }); 
+    }
+    
     mapa.forEach((m, i) => { const d = document.createElement('div'); d.className = 'cell'; d.id = 'cell-' + i; d.innerHTML = `${m.n}<br>${m.p > 0 ? '$'+m.p : ''}`; document.getElementById('board').appendChild(d); });
 </script>
 </body>
