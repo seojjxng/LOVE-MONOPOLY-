@@ -10,7 +10,7 @@
         .container { display: flex; gap: 25px; width: 1000px; }
         .game-column { display: flex; flex-direction: column; gap: 15px; }
         .board { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(5, 100px); gap: 8px; background: #ffccd5; padding: 15px; border-radius: 25px; position: relative; }
-        .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; cursor: pointer; }
+        .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; }
         .token { width: 35px; height: 35px; position: absolute; z-index: 10; transition: all 0.5s ease; pointer-events: none; }
         .center-zone { grid-column: 2 / 5; grid-row: 2 / 5; background: #fff5f7; border: 3px dashed #ff80bf; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; }
         .sidebar { width: 320px; display: flex; flex-direction: column; gap: 20px; }
@@ -39,7 +39,6 @@
                 <div id="turno-text" style="font-weight:bold;">ESPERANDO...</div>
                 <div id="dado-valor">0</div>
                 <img src="https://i.imgur.com/Nsafzb4.png" style="width:60px; cursor:pointer" onclick="tirarDado()">
-                <div id="acciones"></div>
                 <div>💖 $<span id="dinero-mio">1000</span></div>
             </div>
         </div>
@@ -105,11 +104,13 @@
 
     function comprar(pos) {
         db.ref('salas/' + sala + '/propiedades/' + pos).set({owner: miIdx, nivel: 0});
+        log(nombres[miIdx] + " compró " + mapa[pos].n);
         document.getElementById('modal').style.display = 'none';
     }
 
     function mejorar(pos) {
         db.ref('salas/' + sala + '/propiedades/' + pos + '/nivel').transaction(n => (n || 0) + 1);
+        log(nombres[miIdx] + " mejoró " + mapa[pos].n);
         document.getElementById('modal').style.display = 'none';
     }
 
@@ -119,9 +120,16 @@
             let s = snap.val(); if(s.turno !== miIdx) return;
             let val = Math.floor(Math.random()*6)+1;
             document.getElementById('dado-valor').innerText = val;
-            let nuevaPos = (s.jugadores[miIdx].pos + val) % mapa.length;
+            let nuevaPos = s.jugadores[miIdx].pos + val;
+            if(nuevaPos >= mapa.length) { 
+                nuevaPos %= mapa.length; 
+                db.ref('salas/'+sala+'/jugadores/'+miIdx+'/dinero').transaction(d => d + 200);
+                log(nombres[miIdx] + " pasó por SALIDA y cobró $200");
+            }
             db.ref('salas/' + sala + '/jugadores/' + miIdx + '/pos').set(nuevaPos);
             db.ref('salas/' + sala + '/turno').set((s.turno + 1) % s.jugadores.length);
+            // Solo abrir si caes en la casilla después del movimiento
+            setTimeout(() => manejarCasilla(nuevaPos), 600);
         }); 
     }
 
@@ -141,10 +149,8 @@
     mapa.forEach((m, i) => { 
         const d = document.createElement('div'); d.className = 'cell'; d.id = 'cell-' + i; 
         d.innerHTML = `${m.n}<br>${m.p > 0 ? '$'+m.p : ''}`;
-        d.onclick = () => manejarCasilla(i);
         document.getElementById('board').appendChild(d); 
     });
 </script>
 </body>
-</html>
 </html>
