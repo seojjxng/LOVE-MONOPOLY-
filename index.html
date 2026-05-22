@@ -65,7 +65,6 @@
     <button class="btn" onclick="document.getElementById('modal').style.display='none'">Cerrar</button>
 </div>
 
-
 <script>
     const firebaseConfig = { databaseURL: "https://monopolovely-default-rtdb.firebaseio.com" };
     firebase.initializeApp(firebaseConfig);
@@ -107,7 +106,7 @@
             document.getElementById('dado-valor').innerText = val;
             let nuevaPos = (j.pos + val) % mapa.length;
             
-            if(j.pos + val >= mapa.length) {
+            if(nuevaPos < j.pos) {
                 db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => (d || 0) + 200);
             }
             
