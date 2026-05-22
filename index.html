@@ -228,7 +228,7 @@
     function manejarCasilla(pos) {
         let p = mapa[pos];
         if (p.n === "A LA CÁRCEL" || p.n === "CÁRCEL") {
-            db.ref('salas/'+sala+'/jugadores/'+miIdx).update({pos: 11, enCarcel: 1});
+            db.ref('salas/'+sala+'/jugadores/'+miIdx).update({pos: 11, enCarcel: 2});
             log(nombres[miIdx] + " fue enviado a la cárcel.");
             document.getElementById('modal-title').innerText = "Cárcel";
             document.getElementById('modal-text').innerText = "¡Tiene derecho a guardar silencio y a un abogado!";
