@@ -9,57 +9,34 @@
         body { background: #fff0f3; font-family: 'Montserrat', sans-serif; display: flex; justify-content: center; padding: 20px; color: #c71585; }
         .container { display: flex; gap: 25px; width: 1000px; }
         .game-column { display: flex; flex-direction: column; gap: 15px; }
-        .board { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(5, 100px); gap: 8px; background: #ffccd5; padding: 15px; border-radius: 25px; position: relative; }
+        .board { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(5, 100px); gap: 8px; background: #ffccd5; padding: 15px; border-radius: 25px; }
         .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; }
-        .token { width: 35px; height: 35px; position: absolute; z-index: 10; transition: all 0.5s ease; pointer-events: none; }
-        .center-zone { grid-column: 2 / 5; grid-row: 2 / 5; background: #fff5f7; border: 3px dashed #ff80bf; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; }
         .sidebar { width: 320px; display: flex; flex-direction: column; gap: 20px; }
         .panel { background: #fff0f9; padding: 20px; border-radius: 20px; border: 2px solid #ffccd5; }
-        .btn { width: 100%; padding: 10px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin: 5px 0; font-size: 12px; }
+        .btn { width: 100%; padding: 10px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin: 5px 0; }
         .input-field { width: 93%; padding: 8px; margin: 5px 0; border: 1px solid #ffccd5; border-radius: 8px; }
-        #log, #chat-log { height: 150px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; margin-bottom: 10px; }
-        #modal { display: none; position: fixed; top: 20%; left: 35%; width: 300px; background: #ffe4e9; padding: 20px; border: 3px solid #ff80bf; border-radius: 15px; text-align: center; z-index: 999; }
-        .modal-error { border: 3px solid #eb3874 !important; background: #f7adcf !important; color: #7a003e; }
-        #banco-container { display: flex; align-items: center; justify-content: center; background: #fff0f9; border: 2px solid #ffccd5; border-radius: 20px; padding: 15px; gap: 20px; }
+        #log, #chat-log { height: 120px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div class="game-column">
-        <div class="board" id="board">
-            <div class="center-zone">
-                <div id="turno-text">ESPERANDO...</div>
-                <div id="dado-valor">0</div>
-                <img src="https://i.imgur.com/Nsafzb4.png" style="width:60px; cursor:pointer" onclick="tirarDado()">
-                <div>💖 $<span id="dinero-mio">1000</span></div>
-            </div>
-        </div>
-        <div id="banco-container">
-            <button class="btn" onclick="abrirBanco()">🏦 Préstamo</button>
-            <button class="btn" onclick="verSaldos()">💰 Ver Saldos</button>
-        </div>
+        <div class="board" id="board"></div>
     </div>
     <div class="sidebar">
         <div class="panel">
             <strong>Unirse a Sala</strong>
-            <input type="text" id="sala-id" class="input-field">
-            <button class="btn" onclick="unirse()">Entrar</button>
+            <input type="text" id="sala-id" class="input-field" placeholder="Nombre sala">
+            <button class="btn" onclick="iniciarConexion()">Entrar</button>
         </div>
         <div class="panel">
             <strong>Historial</strong><div id="log"></div>
             <strong>Chat</strong><div id="chat-log"></div>
-            <input type="text" id="chat-msg" class="input-field">
+            <input type="text" id="chat-msg" class="input-field" placeholder="Mensaje...">
             <button class="btn" onclick="enviarChat()">Enviar</button>
         </div>
     </div>
-</div>
-
-<div id="modal">
-    <h3 id="modal-title"></h3>
-    <p id="modal-text"></p>
-    <div id="modal-extra"></div>
-    <button class="btn" onclick="cerrarModal()">Cerrar</button>
 </div>
 
 <script>
@@ -67,89 +44,51 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
     let miIdx = -1, sala = "";
-    const mapa = [{n:"SALIDA",p:0},{n:"IGLESIA",p:100},{n:"?",p:0},{n:"BOUTIQUE",p:200},{n:"A LA CÁRCEL",p:0},{n:"CHEONGDAM",p:500},{n:"GANGNAM",p:520},{n:"SEOCHO-GU",p:250},{n:"MAPO",p:300},{n:"INCHEON",p:350},{n:"JOYAS",p:400},{n:"CÁRCEL",p:0},{n:"IMPUESTOS",p:0},{n:"?",p:0},{n:"ARCA",p:0},{n:"BUKCHON",p:500}];
+    const mapa = [{n:"SALIDA"},{n:"IGLESIA"},{n:"?"},{n:"BOUTIQUE"},{n:"?"},{n:"CHEONGDAM"},{n:"GANGNAM"},{n:"SEOCHO"},{n:"MAPO"},{n:"INCHEON"},{n:"?"},{n:"CÁRCEL"},{n:"IMPUESTOS"},{n:"?"},{n:"ARCA"},{n:"BUKCHON"}];
 
-    function log(txt) { db.ref('salas/'+sala+'/log').push(txt); }
-    
-    function mostrarModal(titulo, txt, esError=false) {
-        const m = document.getElementById('modal');
-        document.getElementById('modal-title').innerText = titulo;
-        document.getElementById('modal-text').innerText = txt;
-        m.className = esError ? 'modal-error' : '';
-        m.style.display = 'block';
-    }
-
-    function cerrarModal() { document.getElementById('modal').style.display = 'none'; }
-
-    function unirse() {
-        sala = document.getElementById('sala-id').value;
-        db.ref('salas/'+sala+'/jugadores').once('value', snap => {
+    function iniciarConexion() {
+        sala = document.getElementById('sala-id').value.trim();
+        if(!sala) { alert("Por favor, escribe un nombre de sala"); return; }
+        
+        // Referencia a la sala
+        const salaRef = db.ref('salas/'+sala);
+        
+        salaRef.child('jugadores').once('value', snap => {
             miIdx = snap.numChildren();
-            db.ref('salas/'+sala+'/jugadores/'+miIdx).set({pos:0, dinero:1000, deuda:0, exentoSalida:false});
-            sincronizar();
-        });
-    }
-
-    function aplicarRetencion(monto) {
-        return new Promise(resolve => {
-            db.ref('salas/'+sala+'/jugadores/'+miIdx).once('value', snap => {
-                let j = snap.val();
-                if (j.deuda > 0 && !j.exentoSalida) {
-                    let retencion = Math.floor(monto * 0.5);
-                    log("El banco retuvo $" + retencion + " de tu ganancia por deuda.");
-                    db.ref('salas/'+sala+'/jugadores/'+miIdx+'/deuda').set(Math.max(0, j.deuda - retencion));
-                    resolve(monto - retencion);
-                } else {
-                    resolve(monto);
-                }
+            // Creamos jugador si la sala está vacía o añadimos al nuevo
+            salaRef.child('jugadores/'+miIdx).set({pos:0, dinero:1000}).then(() => {
+                alert("¡Entraste a la sala: " + sala + "!");
+                sincronizar();
             });
         });
     }
 
-    function tirarDado() {
-        db.ref('salas/'+sala).once('value', snap => {
-            let s = snap.val();
-            let posActual = s.jugadores[miIdx].pos;
-            let val = Math.floor(Math.random()*6)+1;
-            let nuevaPos = (posActual + val) % mapa.length;
-
-            if (nuevaPos < posActual) {
-                aplicarRetencion(200).then(pago => {
-                    db.ref('salas/'+sala+'/jugadores/'+miIdx+'/dinero').transaction(d => d + pago);
-                    log("Pasaste por SALIDA. Recibiste $" + pago);
-                });
-            }
-
-            db.ref('salas/'+sala+'/jugadores/'+miIdx+'/pos').set(nuevaPos);
-            setTimeout(() => manejarCasilla(nuevaPos), 500);
-        });
-    }
-
-    function manejarCasilla(pos) {
-        let p = mapa[pos];
-        if (p.n === "?") {
-            let bonos = [100, 200, -150, 50, -50];
-            let bono = bonos[Math.floor(Math.random()*bonos.length)];
-            aplicarRetencion(bono).then(m => {
-                db.ref('salas/'+sala+'/jugadores/'+miIdx+'/dinero').transaction(d => d + m);
-                mostrarModal("Casilla ?", "Evento aleatorio: $" + m);
-            });
-        }
+    function enviarChat() {
+        if(!sala) return;
+        let msg = document.getElementById('chat-msg').value;
+        db.ref('salas/'+sala+'/chat').push({n: "Jugador "+miIdx, m: msg});
+        document.getElementById('chat-msg').value = "";
     }
 
     function sincronizar() {
         db.ref('salas/'+sala).on('value', snap => {
             let s = snap.val();
-            document.getElementById('dinero-mio').innerText = s.jugadores[miIdx].dinero;
-            let logs = "";
-            if(s.log) Object.values(s.log).forEach(l => logs += l + "<br>");
-            document.getElementById('log').innerHTML = logs;
+            if(!s) return;
+            
+            // Sincronizar Log
+            let l = "";
+            if(s.log) Object.values(s.log).forEach(val => l += val + "<br>");
+            document.getElementById('log').innerHTML = l;
+
+            // Sincronizar Chat
+            let c = "";
+            if(s.chat) Object.values(s.chat).forEach(val => c += "<b>"+val.n+":</b> "+val.m+"<br>");
+            document.getElementById('chat-log').innerHTML = c;
         });
     }
 
     mapa.forEach((m, i) => { 
-        const d = document.createElement('div'); d.className = 'cell'; d.id = 'cell-' + i; 
-        d.innerHTML = `${m.n}<br>${m.p > 0 ? '$'+m.p : ''}`; 
+        const d = document.createElement('div'); d.className = 'cell'; d.innerHTML = m.n; 
         document.getElementById('board').appendChild(d); 
     });
 </script>
