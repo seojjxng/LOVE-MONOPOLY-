@@ -202,9 +202,12 @@
         if(miIdx === -1) return;
         db.ref('salas/' + sala).once('value', snap => {
             let s = snap.val(); if(s.turno !== miIdx) return;
-            if(s.jugadores[miIdx].enCarcel) { 
+            if(s.jugadores[miIdx].enCarcel === 1) { 
+                // Liberamos al jugador para que en su próximo turno pueda tirar
+                db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ enCarcel: 0 });
+                log(nombres[miIdx] + " cumplió su condena y sale de la cárcel.");
                 pasarTurno();
-                return; 
+                return;
             }
             let val = Math.floor(Math.random()*6)+1;
             document.getElementById('dado-valor').innerText = val;
