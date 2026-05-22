@@ -91,30 +91,39 @@
 
     function tirarDado() {
         if(miIdx === -1) return;
-        db.ref('salas/' + sala).once('value', snap => {
-            let s = snap.val();
-            if(s.turno !== miIdx) return;
+        
+        // Bloqueo temporal para evitar clics dobles
+        document.querySelector('img[onclick="tirarDado()"]').style.pointerEvents = 'none';
+
+        db.ref('salas/' + sala).transaction(s => {
+            if (!s || s.turno !== miIdx) return s;
+            
             let j = s.jugadores[miIdx];
             
             if(j.turnosCarcel > 0) {
-                db.ref('salas/' + sala + '/jugadores/' + miIdx + '/turnosCarcel').transaction(t => t - 1);
-                db.ref('salas/' + sala + '/turno').set((s.turno + 1) % s.jugadores.length);
-                return;
+                j.turnosCarcel--;
+                s.turno = (s.turno + 1) % s.jugadores.length;
+                return s;
             }
-            
+
             let val = Math.floor(Math.random() * 6) + 1;
-            document.getElementById('dado-valor').innerText = val;
             let nuevaPos = (j.pos + val) % mapa.length;
             
-            // Lógica de Salida: Si la nueva posición es menor, pasamos por salida
+            // Lógica de cobro al pasar por salida
             if(nuevaPos < j.pos) {
-                db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => (d || 0) + 100);
-                log(nombres[miIdx] + " pasó por SALIDA y cobró $100");
+                j.dinero = (j.dinero || 0) + 100;
             }
             
-            db.ref('salas/' + sala + '/jugadores/' + miIdx + '/pos').set(nuevaPos);
-            verificarCasilla(nuevaPos);
-            db.ref('salas/' + sala + '/turno').set((s.turno + 1) % s.jugadores.length);
+            j.pos = nuevaPos;
+            s.turno = (s.turno + 1) % s.jugadores.length;
+            
+            return s;
+        }).then((result) => {
+            if (result.committed) {
+                // Actualizamos visuales tras confirmar en BD
+                document.getElementById('dado-valor').innerText = "Listo"; 
+                document.querySelector('img[onclick="tirarDado()"]').style.pointerEvents = 'auto';
+            }
         });
     }
 
