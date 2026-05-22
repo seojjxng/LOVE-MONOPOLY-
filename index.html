@@ -122,14 +122,18 @@
     function procesarPago(deudorIdx, acreedorIdx, monto) {
         db.ref('salas/' + sala + '/jugadores').transaction(j => {
             if(!j) return;
-            let p = monto;
+            let total = monto;
+            let pagoParaAcreedor = monto;
+            
             if(j[deudorIdx].deuda > 0) {
-                let ret = Math.min(j[deudorIdx].deuda, Math.floor(p * 0.5));
+                let ret = Math.min(j[deudorIdx].deuda, Math.floor(total * 0.5));
                 j[deudorIdx].deuda -= ret;
-                p -= ret;
+                pagoParaAcreedor -= ret;
+                log("Banco retuvo $" + ret + " de deuda");
             }
-            j[deudorIdx].dinero -= monto;
-            j[acreedorIdx].dinero += p;
+            
+            j[deudorIdx].dinero -= total;
+            j[acreedorIdx].dinero += pagoParaAcreedor;
             return j;
         });
         log(nombres[deudorIdx] + " pagó $" + monto + " a " + nombres[acreedorIdx]);
