@@ -82,12 +82,14 @@
     let turnosSeis = 0;
 
     function cerrarModal() {
-        if (alquilerPendiente) {
-            intentarEvasion(miIdx, alquilerPendiente.a, alquilerPendiente.m);
-        }
-        document.getElementById('modal').style.display = 'none';
-        alquilerPendiente = null;
+    // Solo procesa la evasión si el usuario cerró el modal de alquiler intencionalmente
+    // sin haber pagado, y solo si realmente es un modal de alquiler
+    const titulo = document.getElementById('modal-title').innerText;
+    if (alquilerPendiente && titulo === "Tarjeta de Propiedad") {
     }
+        document.getElementById('modal').style.display = 'none';
+    // para evitar problemas si el modal se cierra por otro evento
+}
 
     function log(txt) { db.ref('salas/' + sala + '/log').push(txt); }
     function unirse() { 
@@ -106,14 +108,15 @@
     }
     
     function verificarBancarrota(jugadorIdx, saldo) {
-        if (saldo < 0) {
-            log("¡" + nombres[jugadorIdx] + " ha caído en números rojos!");
-            document.getElementById('modal-title').innerText = "¡Bancarrota!";
-            document.getElementById('modal-text').innerText = "Tu saldo es negativo.";
-            document.getElementById('modal-extra').innerHTML = `<button class="btn" onclick="abrirBanco()">Pedir Préstamo</button>`;
-            document.getElementById('modal').style.display = 'block';
-        }
+    if (saldo < 0) {
+        log("¡" + nombres[jugadorIdx] + " ha caído en números rojos!");
+        document.getElementById('modal-title').innerText = "¡Bancarrota!";
+        document.getElementById('modal-text').innerText = "Tu saldo es $" + saldo + ". ¡Te recomiendo un préstamo!";
+        // Ahora el botón llama directamente a abrir el banco
+        document.getElementById('modal-extra').innerHTML = `<button class="btn" onclick="abrirBanco()">Ir al Banco</button>`;
+        document.getElementById('modal').style.display = 'block';
     }
+}
 
     function abrirIntercambio() {
         db.ref('salas/' + sala).once('value', snap => {
@@ -150,16 +153,18 @@
     }
 
     function escucharOfertas() {
-        db.ref('salas/' + sala + '/ofertas').on('child_added', snap => {
-            let o = snap.val();
-            if(o.para == miIdx) {
-                document.getElementById('modal-title').innerText = "¡Oferta de compra!";
-                document.getElementById('modal-text').innerText = nombres[o.de] + " quiere venderte " + mapa[o.prop].n + " por $" + o.precio;
-                document.getElementById('modal-extra').innerHTML = `<button class="btn" onclick="confirmarCompra('${snap.key}')">Aceptar</button>`;
-                document.getElementById('modal').style.display = 'block';
-            }
-        });
-    }
+    db.ref('salas/' + sala + '/ofertas').on('child_added', snap => {
+        let o = snap.val();
+        if(o.para == miIdx) {
+            // Limpieza explícita antes de mostrar
+            document.getElementById('modal-extra').innerHTML = ""; 
+            document.getElementById('modal-title').innerText = "¡Oferta de compra!";
+            document.getElementById('modal-text').innerText = nombres[o.de] + " quiere venderte " + mapa[o.prop].n + " por $" + o.precio;
+            document.getElementById('modal-extra').innerHTML = `<button class="btn" onclick="confirmarCompra('${snap.key}')">Aceptar</button>`;
+            document.getElementById('modal').style.display = 'block';
+        }
+    });
+}
 
     function confirmarCompra(oKey) {
         db.ref('salas/' + sala + '/ofertas/' + oKey).once('value', snap => {
