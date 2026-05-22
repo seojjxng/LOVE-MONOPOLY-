@@ -304,18 +304,20 @@
         });
     }
 
-    function ejecutarEvento() {
-        let v = Math.random() > 0.5 ? 100 : -100;
-        db.ref('salas/'+sala+'/jugadores/'+miIdx+'/dinero').transaction(d => {
-            let nuevo = Number(d) + v;
-            setTimeout(() => verificarBancarrota(miIdx, nuevo), 500);
-            return nuevo;
-        });
-        log(nombres[miIdx] + " recibió/perdió $" + Math.abs(v) + " en una casilla de evento.");
-        document.getElementById('modal-title').innerText = "Evento";
-        document.getElementById('modal-text').innerText = "Cambio de balance de $" + v;
-        document.getElementById('modal').style.display = 'block';
-    }
+    function ejecutarEvento(nombreCasilla) {
+    let v = Math.random() > 0.5 ? 100 : -100;
+    let justificacion = v > 0 ? "¡Ganaste un sorteo de la comunidad!" : "¡Tuviste que pagar una multa inesperada!";
+    
+    db.ref('salas/'+sala+'/jugadores/'+miIdx+'/dinero').transaction(d => {
+        let nuevo = Number(d) + v;
+        setTimeout(() => verificarBancarrota(miIdx, nuevo), 500);
+        return nuevo;
+    });
+        log(nombres[miIdx] + " en " + nombreCasilla + ": " + justificacion);
+    document.getElementById('modal-title').innerText = nombreCasilla; // Ahora usará ? o ARCA
+    document.getElementById('modal-text').innerText = justificacion + " ($" + v + ")";
+    document.getElementById('modal').style.display = 'block';
+}
 
     function procesarPago(d, a, m, esEvasionLog = false) {
         db.ref('salas/' + sala + '/jugadores').transaction(j => {
@@ -364,10 +366,25 @@
     }
 
     function pagarPrestamo() {
-        db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ tienePrestamo: false, montoPrestamo: 0 });
-        log(nombres[miIdx] + " liquidó préstamo.");
-        document.getElementById('modal').style.display = 'none';
-    }
+    db.ref('salas/' + sala + '/jugadores/' + miIdx).once('value', snap => {
+        let j = snap.val();
+        if (j.tienePrestamo) {
+            if (j.dinero >= j.montoPrestamo) {
+                db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ 
+                    dinero: firebase.database.ServerValue.increment(-j.montoPrestamo),
+                    tienePrestamo: false, 
+                    montoPrestamo: 0 
+                });
+                log(nombres[miIdx] + " liquidó su préstamo.");
+            } else {
+                alert("No tienes suficiente dinero para pagar el préstamo.");
+            }
+        } else {
+            alert("No tienes préstamos pendientes.");
+        }
+    });
+    document.getElementById('modal').style.display = 'none';
+}
     
     function verSaldos() { 
         db.ref('salas/' + sala + '/jugadores').once('value', snap => { 
