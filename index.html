@@ -123,10 +123,67 @@
     }
 
     function abrirIntercambio() {
-        document.getElementById('modal-title').innerText = "Intercambio";
-        document.getElementById('modal-text').innerText = "Comunícate con otro jugador por el chat para acordar un trato. Esta función está habilitada para propuestas directas.";
-        document.getElementById('modal-extra').innerHTML = `<button class="btn" onclick="document.getElementById('modal').style.display='none'">Entendido</button>`;
-        document.getElementById('modal').style.display = 'block';
+        db.ref('salas/' + sala).once('value', snap => {
+            let data = snap.val();
+            let misProps = [];
+            if(data.propiedades) {
+                Object.keys(data.propiedades).forEach(pIdx => {
+                    if(data.propiedades[pIdx].owner === miIdx) misProps.push(pIdx);
+                });
+            }
+            document.getElementById('modal-title').innerText = "Revender Propiedad";
+            let html = "Selecciona propiedad y comprador:<br>";
+            if(misProps.length === 0) { html += "No tienes propiedades."; }
+            else {
+                misProps.forEach(pIdx => {
+                    let p = mapa[pIdx];
+                    html += `<br><b>${p.n}</b> ($${p.p}): <select id="sel-${pIdx}">`;
+                    data.jugadores.forEach((j, i) => { if(i !== miIdx) html += `<option value="${i}">${nombres[i]}</option>`; });
+                    html += `</select> <button class="btn" onclick="proponerVenta(${pIdx})">Vender</button>`;
+                });
+            }
+            document.getElementById('modal-text').innerHTML = html;
+            document.getElementById('modal-extra').innerHTML = "";
+            document.getElementById('modal').style.display = 'block';
+        });
+    }
+
+    function proponerVenta(pIdx) {
+        let comprador = document.getElementById('sel-'+pIdx).value;
+        let precio = Math.floor(mapa[pIdx].p * 0.8);
+        db.ref('salas/' + sala + '/ofertas').push({prop: pIdx, de: miIdx, para: comprador, precio: precio});
+        log(nombres[miIdx] + " propuso vender " + mapa[pIdx].n + " a " + nombres[comprador] + " por $" + precio);
+        document.getElementById('modal').style.display = 'none';
+    }
+
+    function escucharOfertas() {
+        db.ref('salas/' + sala + '/ofertas').on('child_added', snap => {
+            let o = snap.val();
+            if(o.para == miIdx) {
+                document.getElementById('modal-title').innerText = "¡Oferta de compra!";
+                document.getElementById('modal-text').innerText = nombres[o.de] + " quiere venderte " + mapa[o.prop].n + " por $" + o.precio;
+                document.getElementById('modal-extra').innerHTML = `<button class="btn" onclick="confirmarCompra('${snap.key}')">Aceptar</button>`;
+                document.getElementById('modal').style.display = 'block';
+            }
+        });
+    }
+
+    function confirmarCompra(oKey) {
+        db.ref('salas/' + sala + '/ofertas/' + oKey).once('value', snap => {
+            let o = snap.val();
+            db.ref('salas/' + sala + '/jugadores').transaction(j => {
+                if(j[miIdx].dinero >= o.precio) {
+                    j[miIdx].dinero -= o.precio;
+                    j[o.de].dinero += o.precio;
+                    return j;
+                }
+                return;
+            });
+            db.ref('salas/' + sala + '/propiedades/' + o.prop).update({owner: miIdx});
+            log(nombres[miIdx] + " compró " + mapa[o.prop].n + " a " + nombres[o.de]);
+            db.ref('salas/' + sala + '/ofertas/' + oKey).remove();
+            document.getElementById('modal').style.display = 'none';
+        });
     }
 
     function manejarCasilla(pos) {
@@ -375,36 +432,39 @@
     
     function enviarChat() { let msg = document.getElementById('chat-msg').value; db.ref('salas/' + sala + '/chat').push({ n: nombres[miIdx], m: msg }); document.getElementById('chat-msg').value = ""; }
     
-    function sincronizar() { db.ref('salas/' + sala).on('value', snap => { 
-        let s = snap.val(); if(!s) return; 
-        document.getElementById('dinero-mio').innerText = s.jugadores[miIdx].dinero;
-        document.getElementById('turno-text').innerText = "Turno: " + nombres[s.turno];
-        s.jugadores.forEach((j, i) => { 
-            let el = document.getElementById('p' + i); el.style.display = 'block'; 
-            let cell = document.getElementById('cell-' + j.pos); 
-            el.style.left = (cell.offsetLeft + 30) + 'px'; el.style.top = (cell.offsetTop + 30) + 'px'; 
-            el.dataset.pos = j.pos;
-        });
-        if(s.propiedades) { Object.keys(s.propiedades).forEach(pos => { 
-            let cell = document.getElementById('cell-' + pos);
-            cell.style.backgroundColor = colores[s.propiedades[pos].owner];
-            
-            let hc = cell.querySelector('.house-container');
-            hc.innerHTML = "";
-            let nivel = s.propiedades[pos].nivel || 0;
-            if(nivel > 0 && nivel < 5) {
-                for(let i=0; i<nivel; i++) {
-                    let h = document.createElement('div'); h.className = 'house';
+    function sincronizar() { 
+        escucharOfertas();
+        db.ref('salas/' + sala).on('value', snap => { 
+            let s = snap.val(); if(!s) return; 
+            document.getElementById('dinero-mio').innerText = s.jugadores[miIdx].dinero;
+            document.getElementById('turno-text').innerText = "Turno: " + nombres[s.turno];
+            s.jugadores.forEach((j, i) => { 
+                let el = document.getElementById('p' + i); el.style.display = 'block'; 
+                let cell = document.getElementById('cell-' + j.pos); 
+                el.style.left = (cell.offsetLeft + 30) + 'px'; el.style.top = (cell.offsetTop + 30) + 'px'; 
+                el.dataset.pos = j.pos;
+            });
+            if(s.propiedades) { Object.keys(s.propiedades).forEach(pos => { 
+                let cell = document.getElementById('cell-' + pos);
+                cell.style.backgroundColor = colores[s.propiedades[pos].owner];
+                
+                let hc = cell.querySelector('.house-container');
+                hc.innerHTML = "";
+                let nivel = s.propiedades[pos].nivel || 0;
+                if(nivel > 0 && nivel < 5) {
+                    for(let i=0; i<nivel; i++) {
+                        let h = document.createElement('div'); h.className = 'house';
+                        hc.appendChild(h);
+                    }
+                } else if(nivel === 5) {
+                    let h = document.createElement('div'); h.className = 'hotel';
                     hc.appendChild(h);
                 }
-            } else if(nivel === 5) {
-                let h = document.createElement('div'); h.className = 'hotel';
-                hc.appendChild(h);
-            }
-        }); }
-        if(s.chat) { let h = ""; Object.values(s.chat).forEach(c => h += "<b>"+c.n+":</b> "+c.m+"<br>"); document.getElementById('chat-log').innerHTML = h; }
-        if(s.log) { let h = ""; Object.values(s.log).forEach(l => h += l + "<br>"); document.getElementById('log').innerHTML = h; }
-    }); }
+            }); }
+            if(s.chat) { let h = ""; Object.values(s.chat).forEach(c => h += "<b>"+c.n+":</b> "+c.m+"<br>"); document.getElementById('chat-log').innerHTML = h; }
+            if(s.log) { let h = ""; Object.values(s.log).forEach(l => h += l + "<br>"); document.getElementById('log').innerHTML = h; }
+        }); 
+    }
 
     mapa.forEach((m, i) => { 
         const d = document.createElement('div'); 
