@@ -189,6 +189,7 @@
                 return; 
             }
             let val = Math.floor(Math.random()*6)+1;
+            document.getElementById('dado-valor').innerText = val;
             let nueva = (s.jugadores[miIdx].pos + val) % mapa.length;
             if(nueva < s.jugadores[miIdx].pos) {
                 db.ref('salas/' + sala + '/jugadores/' + miIdx + '/dinero').transaction(d => d + 200);
@@ -215,11 +216,20 @@
         let s = snap.val(); if(!s) return; 
         document.getElementById('dinero-mio').innerText = s.jugadores[miIdx].dinero;
         document.getElementById('turno-text').innerText = "Turno: " + nombres[s.turno];
+        
+        // Sincronizar fichas
+        s.jugadores.forEach((j, i) => { 
+            let el = document.getElementById('p' + i); el.style.display = 'block'; 
+            let cell = document.getElementById('cell-' + j.pos); 
+            el.style.left = (cell.offsetLeft + 30) + 'px'; 
+            el.style.top = (cell.offsetTop + 30) + 'px'; 
+        });
+
         if(s.chat) { let h = ""; Object.values(s.chat).forEach(c => h += "<b>"+c.n+":</b> "+c.m+"<br>"); document.getElementById('chat-log').innerHTML = h; }
         if(s.log) { let h = ""; Object.values(s.log).forEach(l => h += l + "<br>"); document.getElementById('log').innerHTML = h; document.getElementById('log').scrollTop = document.getElementById('log').scrollHeight; }
     }); }
     
-    mapa.forEach((m, i) => { const d = document.createElement('div'); d.className = 'cell'; d.innerHTML = m.n; document.getElementById('board').appendChild(d); });
+    mapa.forEach((m, i) => { const d = document.createElement('div'); d.className = 'cell'; d.id = 'cell-' + i; d.innerHTML = m.n; document.getElementById('board').appendChild(d); });
 </script>
 </body>
 </html>
