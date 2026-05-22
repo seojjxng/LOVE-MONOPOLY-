@@ -331,6 +331,14 @@
         db.ref('salas/' + sala).once('value', snap => {
             let s = snap.val(); 
             if(s.turno !== miIdx || s.jugadores[miIdx].enCarcel === 1) return;
+            
+            // Lógica de fallo (20% probabilidad)
+            if (Math.random() < 0.20) {
+                log(nombres[miIdx] + " tuvo un fallo técnico al tirar y pierde el turno.");
+                pasarTurno();
+                return;
+            }
+
             let dado = Math.floor(Math.random()*6)+1;
             document.getElementById('dado-valor').innerText = dado;
             
