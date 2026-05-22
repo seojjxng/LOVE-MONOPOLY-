@@ -20,6 +20,10 @@
         #log, #chat-log { height: 150px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; margin-bottom: 10px; }
         #modal { display: none; position: fixed; top: 20%; left: 35%; width: 300px; background: #ffe4e9; padding: 20px; border: 3px solid #ff80bf; border-radius: 15px; text-align: center; z-index: 999; }
         #banco-container { display: flex; align-items: center; justify-content: center; background: #fff0f9; border: 2px solid #ffccd5; border-radius: 20px; padding: 15px; gap: 20px; }
+        #cell-0 { grid-column: 1; grid-row: 1; } #cell-1 { grid-column: 2; grid-row: 1; } #cell-2 { grid-column: 3; grid-row: 1; } #cell-3 { grid-column: 4; grid-row: 1; } #cell-4 { grid-column: 5; grid-row: 1; }
+        #cell-5 { grid-column: 5; grid-row: 2; } #cell-6 { grid-column: 5; grid-row: 3; } #cell-7 { grid-column: 5; grid-row: 4; } #cell-8 { grid-column: 5; grid-row: 5; }
+        #cell-9 { grid-column: 4; grid-row: 5; } #cell-10 { grid-column: 3; grid-row: 5; } #cell-11 { grid-column: 2; grid-row: 5; } #cell-12 { grid-column: 1; grid-row: 5; }
+        #cell-13 { grid-column: 1; grid-row: 4; } #cell-14 { grid-column: 1; grid-row: 3; } #cell-15 { grid-column: 1; grid-row: 2; }
     </style>
 </head>
 <body>
@@ -75,25 +79,6 @@
     const mapa = [{n:"SALIDA",p:0},{n:"IGLESIA",p:100},{n:"?",p:0},{n:"BOUTIQUE",p:200},{n:"A LA CÁRCEL",p:0},{n:"CHEONGDAM",p:500},{n:"GANGNAM",p:520},{n:"SEOCHO-GU",p:250},{n:"MAPO",p:300},{n:"INCHEON",p:350},{n:"JOYAS",p:400},{n:"CÁRCEL",p:0},{n:"IMPUESTOS",p:0},{n:"?",p:0},{n:"ARCA",p:0},{n:"BUKCHON",p:500}];
 
     function log(txt) { db.ref('salas/' + sala + '/log').push(txt); }
-
-    function procesarPago(deudorIdx, acreedorIdx, monto) {
-        db.ref('salas/' + sala + '/jugadores').transaction(jugadores => {
-            if(!jugadores) return;
-            let pago = monto;
-            // Si tiene deuda, el banco retiene 50% del pago
-            if(jugadores[deudorIdx].deuda > 0) {
-                let retencion = Math.floor(pago * 0.5);
-                jugadores[deudorIdx].deuda -= retencion;
-                pago -= retencion;
-                log(nombres[deudorIdx] + " pagó alquiler, el Banco retuvo $" + retencion + " de su deuda.");
-            }
-            jugadores[deudorIdx].dinero -= monto;
-            jugadores[acreedorIdx].dinero += pago;
-            return jugadores;
-        });
-        log(nombres[deudorIdx] + " pagó $" + monto + " de alquiler a " + nombres[acreedorIdx]);
-    }
-
     function unirse() { sala = document.getElementById('sala-id').value; db.ref('salas/' + sala + '/jugadores').once('value', snap => { miIdx = snap.numChildren(); db.ref('salas/' + sala + '/jugadores/' + miIdx).set({ pos: 0, dinero: 1000, deuda: 0 }); if(miIdx == 0) db.ref('salas/' + sala + '/turno').set(0); sincronizar(); }); }
     
     function manejarCasilla(pos) {
@@ -119,6 +104,23 @@
         });
     }
 
+    function procesarPago(deudorIdx, acreedorIdx, monto) {
+        db.ref('salas/' + sala + '/jugadores').transaction(j => {
+            if(!j) return;
+            let p = monto;
+            if(j[deudorIdx].deuda > 0) {
+                let ret = Math.min(j[deudorIdx].deuda, Math.floor(p * 0.5));
+                j[deudorIdx].deuda -= ret;
+                p -= ret;
+                log("Banco retuvo $" + ret + " de deuda");
+            }
+            j[deudorIdx].dinero -= monto;
+            j[acreedorIdx].dinero += p;
+            return j;
+        });
+        log(nombres[deudorIdx] + " pagó $" + monto + " a " + nombres[acreedorIdx]);
+    }
+
     function comprar(pos) {
         db.ref('salas/' + sala + '/propiedades/' + pos).set({owner: miIdx, nivel: 0});
         log(nombres[miIdx] + " compró " + mapa[pos].n);
@@ -142,10 +144,10 @@
                 nuevaPos %= mapa.length; 
                 db.ref('salas/'+sala+'/jugadores/'+miIdx).transaction(j => {
                     j.dinero += 200;
-                    if(j.deuda > 0) { let ret = 100; j.deuda -= ret; log("Banco cobró $100 de deuda al pasar por SALIDA"); }
+                    if(j.deuda > 0) { let ret = 100; j.deuda -= ret; log("Banco cobró $100 de deuda"); }
                     return j;
                 });
-                log(nombres[miIdx] + " cobró $200 en SALIDA");
+                log(nombres[miIdx] + " pasó SALIDA y cobró $200");
             }
             db.ref('salas/' + sala + '/jugadores/' + miIdx + '/pos').set(nuevaPos);
             db.ref('salas/' + sala + '/turno').set((s.turno + 1) % s.jugadores.length);
@@ -153,7 +155,7 @@
         }); 
     }
 
-    function abrirBanco() { document.getElementById('modal-title').innerText = "Banco"; document.getElementById('modal-text').innerText = "Solicita préstamo:"; let div = document.getElementById('modal-extra'); div.innerHTML = ""; [200, 400, 600].forEach(m => { let b = document.createElement('button'); b.className = 'btn'; b.innerText = "$"+m; b.onclick = () => { db.ref('salas/' + sala + '/jugadores/' + miIdx).transaction(j => { if(j) { j.dinero += m; j.deuda = (j.deuda || 0) + m; } return j; }); log(nombres[miIdx] + " pidió un préstamo de $" + m); document.getElementById('modal').style.display = 'none'; }; div.appendChild(b); }); document.getElementById('modal').style.display = 'block'; }
+    function abrirBanco() { document.getElementById('modal-title').innerText = "Banco"; document.getElementById('modal-text').innerText = "Préstamo:"; let div = document.getElementById('modal-extra'); div.innerHTML = ""; [200, 400, 600].forEach(m => { let b = document.createElement('button'); b.className = 'btn'; b.innerText = "$"+m; b.onclick = () => { db.ref('salas/' + sala + '/jugadores/' + miIdx).transaction(j => { if(j) { j.dinero += m; j.deuda = (j.deuda || 0) + m; } return j; }); log(nombres[miIdx] + " pidió préstamo de $" + m); document.getElementById('modal').style.display = 'none'; }; div.appendChild(b); }); document.getElementById('modal').style.display = 'block'; }
     function verSaldos() { db.ref('salas/' + sala + '/jugadores').once('value', snap => { let txt = ""; snap.forEach(c => txt += nombres[c.key] + ": $" + c.val().dinero + " (Deuda: $" + c.val().deuda + ")<br>"); document.getElementById('modal-title').innerText = "Saldos"; document.getElementById('modal-text').innerHTML = txt; document.getElementById('modal').style.display = 'block'; }); }
     function enviarChat() { let msg = document.getElementById('chat-msg').value; db.ref('salas/' + sala + '/chat').push({ n: nombres[miIdx], m: msg }); document.getElementById('chat-msg').value = ""; }
     
@@ -161,22 +163,19 @@
         let s = snap.val(); if(!s) return; 
         document.getElementById('dinero-mio').innerText = s.jugadores[miIdx].dinero;
         document.getElementById('turno-text').innerText = "Turno: " + nombres[s.turno];
-        s.jugadores.forEach((j, i) => { let el = document.getElementById('p' + i); el.style.display = 'block'; let cell = document.getElementById('cell-' + j.pos); el.style.left = (cell.offsetLeft + 15) + 'px'; el.style.top = (cell.offsetTop + 15) + 'px'; });
-        // Aplicar colores a propiedades
-        if(s.propiedades) {
-            Object.keys(s.propiedades).forEach(pos => {
-                document.getElementById('cell-' + pos).style.backgroundColor = colores[s.propiedades[pos].owner];
-            });
-        }
+        const board = document.getElementById('board');
+        s.jugadores.forEach((j, i) => { 
+            let el = document.getElementById('p' + i); el.style.display = 'block'; 
+            let cell = document.getElementById('cell-' + j.pos); 
+            el.style.left = (cell.offsetLeft + 30) + 'px'; 
+            el.style.top = (cell.offsetTop + 30) + 'px'; 
+        });
+        if(s.propiedades) { Object.keys(s.propiedades).forEach(pos => { document.getElementById('cell-' + pos).style.backgroundColor = colores[s.propiedades[pos].owner]; }); }
         if(s.chat) { let h = ""; Object.values(s.chat).forEach(c => h += "<b>"+c.n+":</b> "+c.m+"<br>"); document.getElementById('chat-log').innerHTML = h; }
         if(s.log) { let h = ""; Object.values(s.log).forEach(l => h += l + "<br>"); document.getElementById('log').innerHTML = h; }
     }); }
 
-    mapa.forEach((m, i) => { 
-        const d = document.createElement('div'); d.className = 'cell'; d.id = 'cell-' + i; 
-        d.innerHTML = `${m.n}<br>${m.p > 0 ? '$'+m.p : ''}`;
-        document.getElementById('board').appendChild(d); 
-    });
+    mapa.forEach((m, i) => { const d = document.createElement('div'); d.className = 'cell'; d.id = 'cell-' + i; d.innerHTML = `${m.n}<br>${m.p > 0 ? '$'+m.p : ''}`; document.getElementById('board').appendChild(d); });
 </script>
 </body>
 </html>
