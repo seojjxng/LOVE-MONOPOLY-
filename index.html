@@ -84,15 +84,18 @@
 
     const cartasEvento = [
         {txt: "¡Inversión exitosa! Cobras $200", v: 200},
-        {txt: "¡Factura de luz! Pagas $50", v: -50},
-        {txt: "¡Premio de belleza! Cobras $100", v: 100},
+        {txt: "¡Olvidaste pagar la factura de luz! Pagas $250 por mora", v: -250},
+        {txt: "¡Premio de certamen de belleza! Cobras $100", v: 100},
         {txt: "¡Reparaciones en casa! Pagas $150", v: -150},
+        {txt: "¡Multa por exceso de velocidad! Pagas $350", v: -350},
+        {txt: "¡Encontraste $60 en la calle! Cobras $60", v: 60},
         {txt: "¡Dividendos bancarios! Cobras $50", v: 50},
         {txt: "¡Multa por exceso de velocidad! Pagas $100", v: -100},
         {txt: "¡Venta de activos! Cobras $250", v: 250},
-        {txt: "¡Gastos médicos! Pagas $200", v: -200},
+        {txt: "¡Gastos médicos de la abuela! Pagas $200", v: -200},
         {txt: "¡Bono de Naeun Town! Cobras $150", v: 150},
         {txt: "¡Impuesto de lujo! Pagas $100", v: -100}
+        {txt: "¡Heredaste una cuantiosa suma de la tía de una tía! Recibes $150", v: 150}
     ];
 
     function obtenerCarta() {
@@ -263,7 +266,7 @@
         } else {
             let montoFinal = m + 50;
             procesarPago(d, a, montoFinal, false);
-            log(nombres[d] + " falló su evasión. Paga $" + montoFinal);
+            log(nombres[d] + " falló su evasión de pago. Paga $" + montoFinal);
         }
     }
 
@@ -304,7 +307,7 @@
     }
 
     function quedarseEnCarcel() {
-        log(nombres[miIdx] + " espera en la cárcel.");
+        log(nombres[miIdx] + " cumplirá su condena en la cárcel.");
         document.getElementById('modal').style.display = 'none';
     }
 
