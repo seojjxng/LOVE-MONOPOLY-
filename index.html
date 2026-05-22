@@ -2,25 +2,26 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Monopoly Naeun Town</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <style>
-        body { background: #fff0f3; font-family: 'Montserrat', sans-serif; display: flex; justify-content: center; padding: 20px; color: #c71585; }
-        .container { display: flex; gap: 25px; width: 1000px; }
-        .game-column { display: flex; flex-direction: column; gap: 15px; }
-        .board { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(5, 100px); gap: 8px; background: #ffccd5; padding: 15px; border-radius: 25px; position: relative; }
-        .cell { background: white; border: 2px solid #ffccd5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #c71585; text-align: center; }
-        .token { width: 35px; height: 35px; position: absolute; z-index: 10; transition: all 0.5s ease; pointer-events: none; }
-        .center-zone { grid-column: 2 / 5; grid-row: 2 / 5; background: #fff5f7; border: 3px dashed #ff80bf; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; }
-        .sidebar { width: 320px; display: flex; flex-direction: column; gap: 20px; }
-        .panel { background: #fff0f9; padding: 20px; border-radius: 20px; border: 2px solid #ffccd5; }
+        body { background: #fff0f3; font-family: 'Montserrat', sans-serif; display: flex; justify-content: center; padding: 10px; color: #c71585; margin: 0; }
+        .container { display: flex; gap: 15px; width: 100%; max-width: 1000px; flex-wrap: wrap; justify-content: center; }
+        .game-column { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+        .board { display: grid; grid-template-columns: repeat(5, 60px); grid-template-rows: repeat(5, 60px); gap: 4px; background: #ffccd5; padding: 10px; border-radius: 25px; position: relative; }
+        .cell { background: white; border: 2px solid #ffccd5; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 7px; font-weight: bold; color: #c71585; text-align: center; }
+        .token { width: 25px; height: 25px; position: absolute; z-index: 10; transition: all 0.5s ease; pointer-events: none; }
+        .center-zone { grid-column: 2 / 5; grid-row: 2 / 5; background: #fff5f7; border: 3px dashed #ff80bf; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 5px; font-size: 10px; }
+        .sidebar { width: 100%; max-width: 320px; display: flex; flex-direction: column; gap: 15px; }
+        .panel { background: #fff0f9; padding: 15px; border-radius: 20px; border: 2px solid #ffccd5; }
         .btn { width: 100%; padding: 10px; background: #ff59aa; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin: 5px 0; font-size: 12px; }
-        .input-field { width: 93%; padding: 8px; margin: 5px 0; border: 1px solid #ffccd5; border-radius: 8px; }
-        #log { height: 125px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; margin-bottom: 10px; }
-        #chat-log { height: 125px; overflow-y: auto; font-size: 11px; color: #c71585; padding: 10px; background: white; border-radius: 10px; border: 1px solid #ffccd5; margin-bottom: 10px; }
-        #modal { display: none; position: fixed; top: 20%; left: 35%; width: 300px; background: #ffe4e9; padding: 20px; border: 3px solid #ff80bf; border-radius: 15px; text-align: center; z-index: 999; }
-        #banco-container { display: flex; align-items: center; justify-content: center; background: #fff0f9; border: 2px solid #ffccd5; border-radius: 20px; padding: 15px; gap: 20px; }
+        .input-field { width: 88%; padding: 8px; margin: 5px 0; border: 1px solid #ffccd5; border-radius: 8px; }
+        #log { height: 100px; overflow-y: auto; font-size: 10px; color: #c71585; padding: 5px; background: white; border-radius: 10px; border: 1px solid #ffccd5; margin-bottom: 10px; }
+        #chat-log { height: 100px; overflow-y: auto; font-size: 10px; color: #c71585; padding: 5px; background: white; border-radius: 10px; border: 1px solid #ffccd5; margin-bottom: 10px; }
+        #modal { display: none; position: fixed; top: 10%; left: 5%; width: 85%; max-width: 300px; background: #ffe4e9; padding: 20px; border: 3px solid #ff80bf; border-radius: 15px; text-align: center; z-index: 999; }
+        #banco-container { display: flex; align-items: center; justify-content: center; background: #fff0f9; border: 2px solid #ffccd5; border-radius: 20px; padding: 10px; gap: 5px; flex-wrap: wrap; }
         #cell-0 { grid-column: 1; grid-row: 1; } #cell-1 { grid-column: 2; grid-row: 1; } #cell-2 { grid-column: 3; grid-row: 1; } #cell-3 { grid-column: 4; grid-row: 1; } #cell-4 { grid-column: 5; grid-row: 1; }
         #cell-5 { grid-column: 5; grid-row: 2; } #cell-6 { grid-column: 5; grid-row: 3; } #cell-7 { grid-column: 5; grid-row: 4; } #cell-8 { grid-column: 5; grid-row: 5; }
         #cell-9 { grid-column: 4; grid-row: 5; } #cell-10 { grid-column: 3; grid-row: 5; } #cell-11 { grid-column: 2; grid-row: 5; } #cell-12 { grid-column: 1; grid-row: 5; }
@@ -29,6 +30,7 @@
 </head>
 <body>
 
+<!-- (El resto del contenido HTML y el script permanecen exactamente iguales) -->
 <audio loop autoplay>
     <source src="https://dl.dropbox.com/scl/fi/5oxzgnxoe30zqd4m6hdfh/kawaii-playlist-for-snack-time-BGM-POP.mp3?rlkey=1lw76u3u1w1ck3dj2ej5x7ml7&st=y6j07iwx&dl=1" type="audio/mpeg">
 </audio>
@@ -43,14 +45,14 @@
             <div class="center-zone">
                 <div id="turno-text" style="font-weight:bold;">ESPERANDO...</div>
                 <div id="dado-valor">0</div>
-                <img src="https://i.imgur.com/Nsafzb4.png" style="width:60px; cursor:pointer" onclick="tirarDado()">
+                <img src="https://i.imgur.com/Nsafzb4.png" style="width:40px; cursor:pointer" onclick="tirarDado()">
                 <div>💖 $<span id="dinero-mio">1000</span></div>
             </div>
         </div>
         <div id="banco-container">
-            <button class="btn" style="width: 150px" onclick="abrirBanco()">🏦 Préstamo</button>
-            <button class="btn" style="width: 150px" onclick="pagarPrestamo()">💳 Pagar Préstamo</button>
-            <button class="btn" style="width: 150px" onclick="verSaldos()">💰 Ver Saldos</button>
+            <button class="btn" style="width: 90px" onclick="abrirBanco()">🏦 Préstamo</button>
+            <button class="btn" style="width: 90px" onclick="pagarPrestamo()">💳 Pagar</button>
+            <button class="btn" style="width: 90px" onclick="verSaldos()">💰 Saldos</button>
         </div>
     </div>
     <div class="sidebar">
@@ -370,7 +372,7 @@
         s.jugadores.forEach((j, i) => { 
             let el = document.getElementById('p' + i); el.style.display = 'block'; 
             let cell = document.getElementById('cell-' + j.pos); 
-            el.style.left = (cell.offsetLeft + 30) + 'px'; el.style.top = (cell.offsetTop + 30) + 'px'; 
+            el.style.left = (cell.offsetLeft + 15) + 'px'; el.style.top = (cell.offsetTop + 15) + 'px'; 
             el.dataset.pos = j.pos;
         });
         if(s.propiedades) { Object.keys(s.propiedades).forEach(pos => { document.getElementById('cell-' + pos).style.backgroundColor = colores[s.propiedades[pos].owner]; }); }
