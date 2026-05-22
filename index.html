@@ -90,42 +90,37 @@
     }
 
     function tirarDado() {
-        if(miIdx === -1) return;
+    if(miIdx === -1) return;
+    
+    document.querySelector('img[onclick="tirarDado()"]').style.pointerEvents = 'none';
+
+    db.ref('salas/' + sala).transaction(s => {
+        if (!s || s.turno !== miIdx) return s;
         
-        // Bloqueo temporal para evitar clics dobles
-        document.querySelector('img[onclick="tirarDado()"]').style.pointerEvents = 'none';
-
-        db.ref('salas/' + sala).transaction(s => {
-            if (!s || s.turno !== miIdx) return s;
-            
-            let j = s.jugadores[miIdx];
-            
-            if(j.turnosCarcel > 0) {
-                j.turnosCarcel--;
-                s.turno = (s.turno + 1) % s.jugadores.length;
-                return s;
-            }
-
-            let val = Math.floor(Math.random() * 6) + 1;
-            let nuevaPos = (j.pos + val) % mapa.length;
-            
-            // Lógica de cobro al pasar por salida
-            if(nuevaPos < j.pos) {
-                j.dinero = (j.dinero || 0) + 100;
-            }
-            
-            j.pos = nuevaPos;
+        let j = s.jugadores[miIdx];
+        
+        if(j.turnosCarcel > 0) {
+            j.turnosCarcel--;
             s.turno = (s.turno + 1) % s.jugadores.length;
-            
             return s;
-        }).then((result) => {
-            if (result.committed) {
-                // Actualizamos visuales tras confirmar en BD
-                document.getElementById('dado-valor').innerText = "Listo"; 
-                document.querySelector('img[onclick="tirarDado()"]').style.pointerEvents = 'auto';
-            }
-        });
-    }
+        }
+
+        let val = Math.floor(Math.random() * 6) + 1;
+        let nuevaPos = (j.pos + val) % mapa.length;
+        
+        if(nuevaPos < j.pos) j.dinero = (j.dinero || 0) + 100;
+        
+        j.pos = nuevaPos;
+        s.turno = (s.turno + 1) % s.jugadores.length;
+        s.ultimoDado = val; // <--- AGREGA ESTO: guardamos el valor
+        
+        return s;
+    }).then((result) => {
+        if (result.committed) {
+            document.querySelector('img[onclick="tirarDado()"]').style.pointerEvents = 'auto';
+        }
+    });
+}
 
     function verificarCasilla(pos) {
         let div = document.getElementById('acciones'); div.innerHTML = "";
@@ -205,10 +200,14 @@
 
     function sincronizar() {
         db.ref('salas/' + sala).on('value', snap => {
-            let s = snap.val();
-            if(!s) return;
+        let s = snap.val();
+        if(!s) return;
             document.getElementById('dinero-mio').innerText = s.jugadores[miIdx].dinero;
             document.getElementById('turno-text').innerText = "Turno: " + nombres[s.turno];
+
+            if(s.ultimoDado) {
+            document.getElementById('dado-valor').innerText = s.ultimoDado;
+        }
             
             s.jugadores.forEach((j, i) => {
                 let el = document.getElementById('p' + i);
