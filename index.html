@@ -101,7 +101,8 @@
         let p = mapa[pos];
         let extra = document.getElementById('modal-extra'); extra.innerHTML = "";
         if (p.n === "A LA CÁRCEL" || p.n === "CÁRCEL") {
-            db.ref('salas/'+sala+'/jugadores/'+miIdx).update({pos: 11, enCarcel: 1});
+    // Ponemos enCarcel en 1 y turnosCarcel en 1 (el turno actual de espera)
+    db.ref('salas/'+sala+'/jugadores/'+miIdx).update({pos: 11, enCarcel: 1, turnosCarcel: 1});
             log(nombres[miIdx] + " terminó en la cárcel.");
             document.getElementById('modal-title').innerText = "Cárcel";
             document.getElementById('modal-text').innerText = "Estás bajo arresto. ¿Pagar $100 de fianza?";
