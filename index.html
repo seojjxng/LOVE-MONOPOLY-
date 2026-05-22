@@ -25,6 +25,7 @@
         #modal { display: none; position: fixed; top: 20%; left: 35%; width: 300px; background: #ffe4e9; padding: 20px; border: 3px solid #ff80bf; border-radius: 15px; text-align: center; z-index: 999; }
         .card-property { border: 2px solid #c71585; padding: 10px; border-radius: 5px; background: white; margin-bottom: 10px; }
         .card-header { background: #ff80bf; color: white; padding: 5px; font-weight: bold; margin-bottom: 10px; }
+        .empty-debt { padding: 10px; background: #fff; border: 1px solid #ff80bf; border-radius: 10px; color: #ff59aa; font-weight: bold; }
         #banco-container { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; background: #fff0f9; border: 2px solid #ffccd5; border-radius: 20px; padding: 15px; gap: 10px; }
         #cell-0 { grid-column: 1; grid-row: 1; } #cell-1 { grid-column: 2; grid-row: 1; } #cell-2 { grid-column: 3; grid-row: 1; } #cell-3 { grid-column: 4; grid-row: 1; } #cell-4 { grid-column: 5; grid-row: 1; }
         #cell-5 { grid-column: 5; grid-row: 2; } #cell-6 { grid-column: 5; grid-row: 3; } #cell-7 { grid-column: 5; grid-row: 4; } #cell-8 { grid-column: 5; grid-row: 5; }
@@ -68,7 +69,7 @@
     <h3 id="modal-title"></h3>
     <div id="modal-text"></div>
     <div id="modal-extra"></div>
-    <button class="btn" id="btn-cerrar" onclick="document.getElementById('modal').style.display='none'; alquilerPendiente=null;">Cerrar</button></div><script>
+    <button class="btn" id="btn-cerrar" onclick="cerrarModal()">Cerrar</button></div><script>
     const firebaseConfig = { databaseURL: "https://monopolovely-default-rtdb.firebaseio.com" };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
@@ -79,6 +80,14 @@
 
     let alquilerPendiente = null;
     let turnosSeis = 0;
+
+    function cerrarModal() {
+        if (alquilerPendiente) {
+            intentarEvasion(miIdx, alquilerPendiente.a, alquilerPendiente.m);
+        }
+        document.getElementById('modal').style.display = 'none';
+        alquilerPendiente = null;
+    }
 
     function log(txt) { db.ref('salas/' + sala + '/log').push(txt); }
     function unirse() { 
@@ -202,6 +211,7 @@
                     let alquiler = Math.floor(p.p * porcentajes[prop.nivel || 0]);
                     htmlCard += `<p>Dueño: <b>${nombres[prop.owner]}</b></p><p>Alquiler: <b>$${alquiler}</b></p>`;
                     if(esCaida) {
+                        alquilerPendiente = {a: prop.owner, m: alquiler};
                         extra.innerHTML = `
                             <button class="btn" onclick="procesarPago(${miIdx}, ${prop.owner}, ${alquiler})">Pagar Alquiler</button>
                             <button class="btn" style="background:#ff80bf" onclick="intentarEvasion(${miIdx}, ${prop.owner}, ${alquiler})">Intentar Evasión</button>
@@ -305,19 +315,20 @@
     }
 
     function ejecutarEvento(nombreCasilla) {
-    let v = Math.random() > 0.5 ? 100 : -100;
-    let justificacion = v > 0 ? "¡Ganaste un sorteo de la comunidad!" : "¡Tuviste que pagar una multa inesperada!";
-    
-    db.ref('salas/'+sala+'/jugadores/'+miIdx+'/dinero').transaction(d => {
-        let nuevo = Number(d) + v;
-        setTimeout(() => verificarBancarrota(miIdx, nuevo), 500);
-        return nuevo;
-    });
+        let v = Math.random() > 0.5 ? 100 : -100;
+        let justificacion = v > 0 ? "¡Ganaste un sorteo de la comunidad!" : "¡Tuviste que pagar una multa inesperada!";
+        
+        db.ref('salas/'+sala+'/jugadores/'+miIdx+'/dinero').transaction(d => {
+            let nuevo = Number(d) + v;
+            setTimeout(() => verificarBancarrota(miIdx, nuevo), 500);
+            return nuevo;
+        });
         log(nombres[miIdx] + " en " + nombreCasilla + ": " + justificacion);
-    document.getElementById('modal-title').innerText = nombreCasilla; // Ahora usará ? o ARCA
-    document.getElementById('modal-text').innerText = justificacion + " ($" + v + ")";
-    document.getElementById('modal').style.display = 'block';
-}
+        document.getElementById('modal-title').innerText = nombreCasilla;
+        document.getElementById('modal-text').innerText = justificacion + " ($" + v + ")";
+        document.getElementById('modal-extra').innerHTML = ""; 
+        document.getElementById('modal').style.display = 'block';
+    }
 
     function procesarPago(d, a, m, esEvasionLog = false) {
         db.ref('salas/' + sala + '/jugadores').transaction(j => {
@@ -366,25 +377,28 @@
     }
 
     function pagarPrestamo() {
-    db.ref('salas/' + sala + '/jugadores/' + miIdx).once('value', snap => {
-        let j = snap.val();
-        if (j.tienePrestamo) {
-            if (j.dinero >= j.montoPrestamo) {
-                db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ 
-                    dinero: firebase.database.ServerValue.increment(-j.montoPrestamo),
-                    tienePrestamo: false, 
-                    montoPrestamo: 0 
-                });
-                log(nombres[miIdx] + " liquidó su préstamo.");
+        db.ref('salas/' + sala + '/jugadores/' + miIdx).once('value', snap => {
+            let j = snap.val();
+            if (j.tienePrestamo) {
+                if (j.dinero >= j.montoPrestamo) {
+                    db.ref('salas/' + sala + '/jugadores/' + miIdx).update({ 
+                        dinero: firebase.database.ServerValue.increment(-j.montoPrestamo),
+                        tienePrestamo: false, 
+                        montoPrestamo: 0 
+                    });
+                    log(nombres[miIdx] + " liquidó su préstamo.");
+                } else {
+                    alert("No tienes suficiente dinero para pagar el préstamo.");
+                }
             } else {
-                alert("No tienes suficiente dinero para pagar el préstamo.");
+                document.getElementById('modal-title').innerText = "Banco";
+                document.getElementById('modal-text').innerHTML = `<div class="empty-debt">No tienes préstamos pendientes.</div>`;
+                document.getElementById('modal-extra').innerHTML = "";
+                document.getElementById('modal').style.display = 'block';
             }
-        } else {
-            alert("No tienes préstamos pendientes.");
-        }
-    });
-    document.getElementById('modal').style.display = 'none';
-}
+        });
+        document.getElementById('modal').style.display = 'none';
+    }
     
     function verSaldos() { 
         db.ref('salas/' + sala + '/jugadores').once('value', snap => { 
